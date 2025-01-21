@@ -3,29 +3,6 @@
 This project implements the ML Mental Health Modeling Pipeline on Google Cloud Platform (GCP), utilizing Vertex AI for model development and deployment, and Terraform for seamless infrastructure provisioning and management.
 
 
-To Deploy:
-
-
-1. Initialize the project
-
-```
-    terraform init
-    terraform apply -var-file=terraform/pipeline.json.tfvars
-```
-
-2. Manually trigger the pipeline (Note: This is automated using pub/sub in production)
-
-```
-    curl -X POST https://REGION-PROJECT_ID.cloudfunctions.net/trigger_pipeline
-```
-
-
-# Mental Health Evaluation Service Deployment on GCP and Vertex AI
-
-This project implements the Mental Health Evaluation service on
-Google Cloud Platform (GCP), leveraging Vertex AI and managed through
-Terraform for infrastructure provisioning.
-
 ## Prerequisites
 
 Before deploying this project, ensure the following:
