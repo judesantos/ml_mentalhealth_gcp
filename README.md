@@ -39,16 +39,15 @@ Follow these steps to deploy the infrastructure:
 ### 1. Clone the Repository
 Clone the repository containing this Terraform project:
 ```
-    git clone [repository_url]
-    cd [project_directory]
+    git clone https://github.com/judesantos/ml_mentalhealth_gcp
+    cd ml_mentalhealth_gcp
 ```
 
 ### 2. Set Up Terraform Variables
 Create a terraform.tfvars file to specify your variables (replace placeholders with actual values):
 ```
-    project_id = "your-gcp-project-id"
-    region     = "your-region"
-    zone       = "your-zone"
+    project_id = "gcp-project-id"
+    region     = "region"
 ```
 Alternatively, you can pass variables during execution or use environment variables.
 
@@ -85,13 +84,30 @@ To remove the deployed infrastructure:
 
 ## Project Structure
 ```
-    ├── main.tf                # Main Terraform configuration
-    ├── variables.tf           # Input variables
-    ├── outputs.tf             # Outputs
-    ├── terraform.tfvars       # Variable definitions (ignored in .gitignore)
-    ├── provider.tf            # Provider configuration (e.g., GCP)
-    ├── modules/               # Optional reusable Terraform modules
-    └── .gitignore             # Git ignore file
+    ├── README.md
+    ├── .gitignore                  # Git ignore file
+    ├── cloud_functions
+    │   ├── deploy_model
+    │   │   ├── main.py
+    │   │   └── requirements.txt
+    │   ├── register_model
+    │   │   ├── main.py
+    │   │   └── requirements.txt
+    │   └── trigger_pipeline
+    │       ├── main.py
+    │       └── requirements.txt
+    ├── pipelines
+    │   ├── components
+    │   │   ├── preprocess.py
+    │   │   ├── train.py
+    │   │   └── evaluate.py
+    │   └── pipeline.py            # The ML model pipeline
+    └── terraform
+        ├── main.tf                # Main Terraform configuration
+        ├── variables.tf           # Input variables
+        ├── pipeline.json.tfvars   # Variable definitions (ignored in .gitignore)
+        └── versions.tf
+
 ```
 
 ## Notes
