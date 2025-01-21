@@ -86,26 +86,26 @@ To remove the deployed infrastructure:
 ```
     ├── README.md
     ├── .gitignore                  # Git ignore file
-    ├── cloud_functions
+    ├── cloud_functions             # The cloud services pipeline operations
     │   ├── deploy_model
-    │   │   ├── main.py
+    │   │   ├── main.py             # Deploy model to an vertex endpoint
     │   │   └── requirements.txt
     │   ├── register_model
-    │   │   ├── main.py
+    │   │   ├── main.py             # Transfer trained model to the model registry
     │   │   └── requirements.txt
     │   └── trigger_pipeline
-    │       ├── main.py
+    │       ├── main.py             # Start the pipeline process
     │       └── requirements.txt
     ├── pipelines
     │   ├── components
-    │   │   ├── preprocess.py
-    │   │   ├── train.py
-    │   │   └── evaluate.py
-    │   └── pipeline.py            # The ML model pipeline
+    │   │   ├── preprocess.py       # Dataset preprocessing
+    │   │   ├── train.py            # Model trainingj
+    │   │   └── evaluate.py         # Evaluate the model
+    │   └── pipeline.py             # The ML model pipeline
     └── terraform
-        ├── main.tf                # Main Terraform configuration
-        ├── variables.tf           # Input variables
-        ├── pipeline.json.tfvars   # Variable definitions (ignored in .gitignore)
+        ├── main.tf                 # Main Terraform configuration
+        ├── variables.tf            # Input variables
+        ├── pipeline.json.tfvars    # Variable definitions (ignored in .gitignore)
         └── versions.tf
 
 ```
