@@ -36,3 +36,8 @@ override.tf.json
 # Ignore log files
 *.log
 
+__pycache__/
+pipeline.json
+trigger_pipeline.zip
+*.out
+*.backup

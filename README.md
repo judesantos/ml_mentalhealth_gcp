@@ -76,7 +76,19 @@ Once the deployment completes:
 
 Check the GCP Console to verify the resources.
 Ensure all services are running as expected.
-7. Clean Up (Optional)
+
+### 7. Get outputs
+
+The result of the operation (terraform apply) will be stored as resources
+that can be viewed later on.
+
+You can retrieve the terraform outputs to generate a report.
+
+```
+    terraform output -json > pipeline_report.json
+```
+
+### 8. Clean Up (Optional)
 To remove the deployed infrastructure:
 ```
     terraform destroy
@@ -85,27 +97,32 @@ To remove the deployed infrastructure:
 ## Project Structure
 ```
     ├── README.md
-    ├── .gitignore                  # Git ignore file
-    ├── cloud_functions             # The cloud services pipeline operations
-    │   ├── deploy_model
-    │   │   ├── main.py             # Deploy model to an vertex endpoint
+    ├── cloud_functions
+    │   ├── retraining_notification
+    │   │   ├── main.py
     │   │   └── requirements.txt
-    │   ├── register_model
-    │   │   ├── main.py             # Transfer trained model to the model registry
+    │   ├── trigger_pipeline
+    │   │   ├── main.py
     │   │   └── requirements.txt
-    │   └── trigger_pipeline
-    │       ├── main.py             # Start the pipeline process
+    │   └── vertex_ai_notification
+    │       ├── main.py
     │       └── requirements.txt
+    ├── environment.yml
     ├── pipelines
     │   ├── components
-    │   │   ├── preprocess.py       # Dataset preprocessing
-    │   │   ├── train.py            # Model trainingj
-    │   │   └── evaluate.py         # Evaluate the model
-    │   └── pipeline.py             # The ML model pipeline
+    │   │   ├── build.py
+    │   │   ├── deploy.py
+    │   │   ├── evaluate.py
+    │   │   ├── preprocess.py
+    │   │   ├── register.py
+    │   │   └── train.py
+    │   └── pipeline.py
     └── terraform
-        ├── main.tf                 # Main Terraform configuration
-        ├── variables.tf            # Input variables
-        ├── pipeline.json.tfvars    # Variable definitions (ignored in .gitignore)
+        ├── graph.png
+        ├── main.tf
+        ├── output.tf
+        ├── terraform.tfvars
+        ├── variables.tf
         └── versions.tf
 
 ```
