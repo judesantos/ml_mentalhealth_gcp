@@ -654,32 +654,47 @@ resource "null_resource" "mlops_app_docker_build" {
     command     = <<EOT
       #!/bin/bash
       set -e
+      # Set the image ID according to GCP artifact registry format
       IMAGE_ID=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}
       rm -rf repo # Remove the repo if it exists
 
-      # Clone the GitHub repository
-      git clone ${google_cloudbuildv2_repository.mlops_app_repo.remote_uri} repo
-      cd repo
+      # Clone the GitHub repository with the given tag
+      git clone --branch ${var.image_tag} --depth 1 ${google_cloudbuildv2_repository.mlops_app_repo.remote_uri} repo
+
+      ENV_FILE_PATH=$(realpath "${var.env_file}")
+      CERT_FOLDER_PATH=$(realpath "${var.cert}")
 
       # Copy the .env file from the local system to the cloned repository
-      if [ -f "${var.env_file}" ]; then
-        cp "${var.env_file}" .env
+      if [ -f "$ENV_FILE_PATH" ]; then
+        cp "$ENV_FILE_PATH" ./repo/.env
       else
-        echo "Warning: .env file not found at ${var.env_file}"
+        echo "Error: .env file not found at $ENV_FILE_PATH"
+        exit 1
       fi
 
       # Copy the cert folder if it exists
-      if [ -d "${var.cert}" ]; then
-        cp -r "${var.cert}" ./cert
+      if [ -d "$CERT_FOLDER_PATH" ]; then
+        cp -r "$CERT_FOLDER_PATH" ./repo/certs
       else
-        echo "Warning: cert folder not found at ${var.cert}"
+        echo "Error: cert folder not found at $CERT_FOLDER_PATH"
+        exit 1
       fi
 
-      # Build the Docker image
-      docker build -t $IMAGE_ID  .
+      # Go to the docker build directory
+      cd repo
+
+      # Clean up the Docker builder cache
+      docker builder prune --all
+
+      # Build the Docker image according to GCP platform specifications
+      docker buildx build --no-cache --platform=linux/amd64 -t $IMAGE_ID  .
 
       # Push the Docker image to GCR
       docker push $IMAGE_ID
+
+      # Clean up
+      rm -rf repo
+
     EOT
     interpreter = ["/bin/bash", "-c"]
   }
@@ -1061,19 +1076,15 @@ resource "google_compute_global_address" "private_ip_alloc" {
 }
 
 resource "google_service_networking_connection" "private_vpc_connection" {
-  network                 = google_compute_network.mlops_vpc_network.self_link
+  network                 = google_compute_network.mlops_vpc_network.id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_alloc.name]
 
-  #lifecycle {
-  #  ignore_changes = [reserved_peering_ranges]
-  #}
+  lifecycle {
+    ignore_changes = all
+  }
 
-  depends_on = [
-    google_compute_network.mlops_vpc_network,
-    google_compute_global_address.private_ip_alloc,
-    google_service_networking_connection.private_vpc_connection
-  ]
+  depends_on = [google_service_networking_connection.private_vpc_connection]
 }
 
 # Create Cloud SQL PostgreSQL Instance
@@ -1097,6 +1108,8 @@ resource "google_sql_database_instance" "pg_instance" {
       enabled = false
     }
   }
+
+  depends_on = [google_service_networking_connection.vpc_peering]
 }
 
 # Create PostgreSQL Database
