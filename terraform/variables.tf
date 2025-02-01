@@ -4,7 +4,7 @@ variable "project_id" {
 }
 
 variable "project_number" {
-  description = "Google Cloud Project ID"
+  description = "Google Cloud Project number"
   type        = number
 }
 
@@ -33,10 +33,10 @@ variable "github_app_id" {
 variable "github_token" {
   description = "GitHub Access Token"
   type        = string
-  sensitive  = true
+  sensitive   = true
 }
 
-variable "docker_image_tag" {
+variable "image_tag" {
   description = "Docker image tag"
   type        = string
   default     = "latest"
@@ -46,3 +46,14 @@ variable "email" {
   description = "Email address"
   type        = string
 }
+
+variable "env_file" {
+  description = "Path to the .env file"
+  type        = string
+}
+
+variable "cert" {
+  description = "Path to the SSL certificate"
+  type        = string
+}
+

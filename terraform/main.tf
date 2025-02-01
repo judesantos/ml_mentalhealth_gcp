@@ -3,10 +3,11 @@ provider "google" {
   region  = var.region
 }
 
+data "google_client_config" "provider" {}
+
 provider "kubernetes" {
   host                   = "https://${google_container_cluster.mlops_gke_cluster.endpoint}"
-  client_certificate     = base64decode(google_container_cluster.mlops_gke_cluster.master_auth[0].client_certificate)
-  client_key             = base64decode(google_container_cluster.mlops_gke_cluster.master_auth[0].client_key)
+  token                  = data.google_client_config.provider.access_token
   cluster_ca_certificate = base64decode(google_container_cluster.mlops_gke_cluster.master_auth[0].cluster_ca_certificate)
 }
 
@@ -20,25 +21,37 @@ resource "google_service_account" "mlops_service_account" {
 }
 
 resource "google_project_iam_member" "mlops_permissions" {
+  project = var.project_id
+
   for_each = toset([
     "roles/owner",
     "roles/editor",
     "roles/serviceusage.serviceUsageAdmin",
+    "roles/compute.securityAdmin",
     "roles/cloudkms.admin",
     "roles/container.admin",
     "roles/container.clusterAdmin",
     "roles/container.nodeServiceAccount",
     "roles/cloudbuild.builds.editor",
     "roles/cloudbuild.builds.builder",
-    "roles/artifactregistry.writer",
+    "roles/cloudbuild.builds.viewer",
+    #"roles/artifactregistry.writer",
+    #"roles/artifactregistry.reader",
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
     "roles/resourcemanager.projectIamAdmin",
     "roles/container.developer",
     "roles/storage.admin",
+    "roles/storage.objectViewer",
+    "roles/storage.objectAdmin",
     "roles/secretmanager.secretAccessor",
+    "roles/cloudsql.client",
+    "roles/cloudsql.admin",
   ])
-  project = var.project_id
-  role    = each.key
-  member  = "serviceAccount:${google_service_account.mlops_service_account.email}"
+  role = each.key
+
+  member = "serviceAccount:${google_service_account.mlops_service_account.email}"
+
   depends_on = [google_service_account.mlops_service_account]
 }
 
@@ -48,11 +61,70 @@ resource "google_service_account_iam_member" "allow_impersonation" {
   member             = "user:${var.email}"
 }
 
+
+# Create Service Account
+resource "google_service_account" "docker_auth" {
+  account_id   = "docker-auth-sa"
+  display_name = "Docker Authentication Service Account"
+}
+
+# Create Service Account Key
+resource "google_service_account_key" "docker_auth_key" {
+  service_account_id = google_service_account.docker_auth.id
+  public_key_type    = "TYPE_X509_PEM_FILE"
+}
+
+# Grant Permissions for Service Account
+#resource "google_project_iam_member" "artifact_registry_access" {
+#  project = var.project_id
+#  role    = "roles/artifactregistry.writer" # For Artifact Registry
+#  member  = "serviceAccount:${google_service_account.docker_auth.email}"
+#
+#}
+resource "google_project_iam_member" "artifact_registry_access" {
+  project = var.project_id
+
+  for_each = toset([
+    "roles/artifactregistry.writer",
+    "roles/artifactregistry.reader",
+  ])
+  role = each.key
+
+  member = "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com"
+
+  depends_on = [google_service_account.mlops_service_account]
+}
+
+# Login to Docker Registry for the mlop_app deployment in GKE cluster -
+# Pushes the image to GCR then pulls it in the GKE cluster
+resource "null_resource" "docker_auth" {
+  provisioner "local-exec" {
+    command = "echo '${base64decode(google_service_account_key.docker_auth_key.private_key)}' | docker login -u _json_key --password-stdin https://gcr.io"
+  }
+}
+
+# -----------------------------------
+# Secret Manager for GitHub Token
+# -----------------------------------
+
+resource "google_secret_manager_secret" "github_token" {
+  secret_id = "github-token" # Name of the secret in Secret Manager
+  replication {
+    auto {}
+  }
+}
+
+# Add a version to the secret (store the actual token value)
+resource "google_secret_manager_secret_version" "github_token" {
+  secret      = google_secret_manager_secret.github_token.id
+  secret_data = var.github_token # Your GitHub token (mark as sensitive)
+}
+
 # The service account serviceAccount:service-416879185829@g* is somehow
 # expected by cloud build, we need to create it and give it the necessary
 # permissions for the github connection to work.
 resource "google_secret_manager_secret_iam_member" "github_token_accessor" {
-  secret_id = "github-token" # Replace with your secret's name
+  secret_id = "github-token"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:service-416879185829@gcp-sa-cloudbuild.iam.gserviceaccount.com"
 }
@@ -63,88 +135,168 @@ resource "google_project_iam_member" "cloudbuild_secret_access" {
   member  = "serviceAccount:cloud-build-editor@ml-mentalhealth.iam.gserviceaccount.com"
 }
 
+resource "google_secret_manager_secret_iam_member" "cloudbuild_secret_access" {
+  secret_id = google_secret_manager_secret.github_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:service-${var.project_number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+}
+
 # -----------------------------------
 # Enable Required Services
 # -----------------------------------
+
 resource "google_project_service" "iam" {
   service = "iam.googleapis.com"
   project = var.project_id
 }
 
-#resource "google_project_service" "enable_kms" {
-#  project = var.project_id
-#  service = "cloudkms.googleapis.com"
-#
-#  depends_on = [google_project_service.iam]
-#}
+
+resource "google_project_service" "serviceusage" {
+  project                    = var.project_id
+  service                    = "serviceusage.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+}
+
+resource "google_project_service" "compute" {
+  project                    = var.project_id
+  service                    = "compute.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+
+  depends_on = [google_project_service.serviceusage]
+}
+
+resource "google_project_service" "notebooks" {
+  project                    = var.project_id
+  service                    = "notebooks.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+  depends_on                 = [google_project_service.compute]
+}
+
+resource "google_project_service" "cloudfunctions" {
+  project                    = var.project_id
+  service                    = "cloudfunctions.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+}
+
+resource "google_project_service" "pubsub" {
+  project                    = var.project_id
+  service                    = "pubsub.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+  depends_on                 = [google_project_service.cloudfunctions]
+}
+
+resource "google_project_service" "bigquery" {
+  project                    = var.project_id
+  service                    = "bigquery.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+}
+
+resource "google_project_service" "bigquerystorage" {
+  project                    = var.project_id
+  service                    = "bigquerystorage.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+  depends_on                 = [google_project_service.bigquery]
+}
+
+resource "google_project_service" "servicemanagement" {
+  project                    = var.project_id
+  service                    = "servicemanagement.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+}
+
+resource "google_project_service" "cloudapis" {
+  project                    = var.project_id
+  service                    = "cloudapis.googleapis.com"
+  disable_dependent_services = true
+  disable_on_destroy         = true
+
+  depends_on = [
+    google_project_service.compute,
+    google_project_service.bigquery,
+    google_project_service.serviceusage,
+    google_project_service.servicemanagement
+  ]
+}
 
 resource "google_project_service" "enabled_services" {
+  project                    = var.project_id
+  disable_dependent_services = true
+  disable_on_destroy         = true
+
   for_each = toset([
-    "serviceusage.googleapis.com",
-    "servicemanagement.googleapis.com",
     "containerregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "aiplatform.googleapis.com",
     "container.googleapis.com",
     "dataflow.googleapis.com",
-    "compute.googleapis.com",
     "artifactregistry.googleapis.com",
-    #"cloudresourcemanager.googleapis.com",
-    "bigquery.googleapis.com",
     "aiplatform.googleapis.com",
-    "pubsub.googleapis.com",
     "file.googleapis.com",
   ])
-
   service = each.key
-  depends_on = [google_project_service.iam]
+
+  depends_on = [
+    google_project_service.iam,
+    google_project_service.notebooks,
+    google_project_service.pubsub,
+    google_project_service.bigquerystorage,
+    google_project_service.cloudapis
+  ]
 }
 
 # -----------------------------------
 # VPC and Subnets
 # -----------------------------------
-resource "google_compute_network" "vpc_network" {
-  name = "mlops-vpc-network"
+
+resource "google_compute_network" "mlops_vpc_network" {
+  name                    = "mlops-vpc-network"
+  project                 = var.project_id
+  auto_create_subnetworks = false
+
+  depends_on = [google_project_service.compute]
 }
 
 resource "google_compute_subnetwork" "public_subnet" {
   name          = "mlops-public-subnet"
-  ip_cidr_range = "10.0.0.0/24"
   region        = var.region
-  network       = google_compute_network.vpc_network.id
+  network       = google_compute_network.mlops_vpc_network.id
+  ip_cidr_range = "10.0.1.0/24"
 
-  private_ip_google_access = true
-
-  log_config {
-    aggregation_interval = "INTERVAL_10_MIN" # Options: INTERVAL_5_SEC, INTERVAL_1_MIN, INTERVAL_10_MIN
-    flow_sampling        = 0.5              # Fraction of traffic to sample (0.0 to 1.0)
-    metadata             = "INCLUDE_ALL_METADATA" # Options: EXCLUDE_ALL_METADATA, INCLUDE_ALL_METADATA
-  }
 }
 
 resource "google_compute_subnetwork" "private_subnet" {
-  name          = "mlops-private-subnet"
-  ip_cidr_range = "10.0.1.0/24"
-  region        = var.region
-  network       = google_compute_network.vpc_network.id
+  name    = "mlops-private-subnet"
+  region  = var.region
+  network = google_compute_network.mlops_vpc_network.id
 
+  ip_cidr_range            = "10.0.2.0/24"
   private_ip_google_access = true
+}
 
-  log_config {
-    aggregation_interval = "INTERVAL_10_MIN" # Options: INTERVAL_5_SEC, INTERVAL_1_MIN, INTERVAL_10_MIN
-    flow_sampling        = 0.5              # Fraction of traffic to sample (0.0 to 1.0)
-    metadata             = "INCLUDE_ALL_METADATA" # Options: EXCLUDE_ALL_METADATA, INCLUDE_ALL_METADATA
-  }
+# -----------------------------------
+# NAT Router
+# -----------------------------------
 
-  secondary_ip_range {
-    range_name    = "pods-range"
-    ip_cidr_range = "10.1.0.0/16"
-  }
+resource "google_compute_router" "nat_router" {
+  name    = "mlops-nat-router"
+  network = google_compute_network.mlops_vpc_network.name
+  region  = var.region
+}
 
-  secondary_ip_range {
-    range_name    = "services-range"
-    ip_cidr_range = "10.2.0.0/20"
-  }
+resource "google_compute_router_nat" "nat_config" {
+  name                               = "mlops-nat-config"
+  router                             = google_compute_router.nat_router.name
+  region                             = google_compute_router.nat_router.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
 }
 
 # -----------------------------------
@@ -153,7 +305,7 @@ resource "google_compute_subnetwork" "private_subnet" {
 
 resource "google_compute_firewall" "allow_internal" {
   name    = "allow-internal"
-  network = google_compute_network.vpc_network.name
+  network = google_compute_network.mlops_vpc_network.name
 
   allow {
     protocol = "tcp"
@@ -165,40 +317,55 @@ resource "google_compute_firewall" "allow_internal" {
 
 resource "google_compute_firewall" "allow_external" {
   name    = "allow-external"
-  network = google_compute_network.vpc_network.name
+  network = google_compute_network.mlops_vpc_network.name
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "80", "443"]
+    ports    = ["22", "8080", "443"]
   }
 
-  source_ranges = ["0.0.0.0/24"] # Replace with your allowed IP range
+  source_ranges = ["0.0.0.0/0"]
   direction     = "INGRESS"
   target_tags   = ["ssh-access"]
 
-  priority = 1000 # Lower number = higher priority
+  priority = 1000 # Lower number the higher the priority
 
   #source_ranges = ["0.0.0.0/0"]
 }
 
-# -----------------------------------
-# Load Balancer
-# -----------------------------------
+resource "google_compute_firewall" "allow_k8s_api" {
+  name    = "allow-k8s-api"
+  network = google_compute_network.mlops_vpc_network.name
 
-resource "google_compute_address" "load_balancer_ip" {
-  name = "load-balancer-ip"
+  direction = "INGRESS"
+  priority  = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  target_tags   = ["private-subnet"]
+  source_ranges = ["192.168.1.0/24"] # Only your office network
+  description   = "Allow Kubernetes API access from office network"
 }
 
-resource "google_compute_target_pool" "load_balancer_pool" {
-  name = "lb-pool"
-}
+resource "google_compute_firewall" "allow_egress_to_api" {
+  name    = "allow-egress-to-api"
+  network = google_compute_network.mlops_vpc_network.name
 
-resource "google_compute_forwarding_rule" "load_balancer_rule" {
-  name       = "http-load-balancer"
-  region     = var.region
-  ip_address = google_compute_address.load_balancer_ip.address
-  port_range = "80"
-  target     = google_compute_target_pool.load_balancer_pool.self_link
+  direction = "EGRESS"
+  priority  = 1000
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+  destination_ranges = ["0.0.0.0/0"] # Allow egress to any destination
 }
 
 # -----------------------------------
@@ -206,245 +373,147 @@ resource "google_compute_forwarding_rule" "load_balancer_rule" {
 # -----------------------------------
 
 resource "google_compute_security_policy" "cloud_armor" {
-  name = "cloud-armor-policy"
+  project = var.project_id
+
+  name        = "cloud-armor"
   description = "Cloud Armor security policy"
 
-}
-
-#resource "google_kms_key_ring" "mlops_key_ring" {
-#  name     = "mlops-key-ring"
-#  location = var.region # Adjust location as necessary
-#
-#  depends_on = [google_project_service.enable_kms]
-#}
-#
-#resource "google_kms_crypto_key" "mlops_crypto_key" {
-#  name            = "mlops-crypto-key"
-#  key_ring        = google_kms_key_ring.mlops_key_ring.id
-#  purpose         = "ENCRYPT_DECRYPT"
-#
-#   # Set a key rotation period
-#  rotation_period = "2592000s" # 30 days
-#
-#}
-
-# -----------------------------------
-# Cloud Storage (GCS) for Data Storage
-# -----------------------------------
-resource "google_storage_bucket" "mlops_gcs_bucket" {
-  name          = "mlops-gcs-bucket"
-  location      = var.region
-  force_destroy = true # Destroy all objects when bucket is destroyed
-
-  logging {
-    log_bucket = "google_storage_bucket.log_bucket"
-    log_object_prefix = "gcs_access_logs"
-  }
-
-  storage_class = "STANDARD"
-  lifecycle_rule {
-    action {
-      type = "Delete"
-    }
-    condition {
-      age = 29 # Delete objects older than 29 days
-    }
-  }
-
-  public_access_prevention = "enforced"
-  #Enable uniform bucket-level access
-  uniform_bucket_level_access = true
-
-  #encryption {
-  #  default_kms_key_name = google_kms_crypto_key.mlops_crypto_key.id
-  #}
+  depends_on = [
+    google_project_iam_member.mlops_permissions,
+    google_project_service.compute,
+  ]
 }
 
 # -----------------------------------
-# GKE Deployment Cluster (Free Tier)
+# Load Balancer
 # -----------------------------------
 
-#resource "google_service_account" "gke_service_account" {
-#  account_id   = "gke-security-groups"
-#  display_name = "GKE Node Service Account"
-#}
+# Routing for the load balancer
+resource "google_compute_url_map" "url_map" {
+  name = "multi-backend-url-map"
+
+  default_service = google_compute_backend_service.mlops_app_backend.self_link
+
+  host_rule {
+    hosts        = ["*"] # Match all hosts, or specify a specific host like "example.com"
+    path_matcher = "mlops-app"
+  }
+
+  path_matcher {
+    name            = "mlops-app"
+    default_service = google_compute_backend_service.mlops_app_backend.self_link
+
+    path_rule {
+      paths   = ["/*"]
+      service = google_compute_backend_service.mlops_app_backend.self_link
+    }
+  }
+}
+
+resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
+  name        = "mlops-ssl-certificate"
+  private_key = file("../certs/app_private_key.pem")
+  certificate = file("../certs/app_certificate.pem")
+}
+
+resource "google_compute_target_https_proxy" "https_proxy" {
+  name             = "https-proxy"
+  url_map          = google_compute_url_map.url_map.self_link
+  ssl_certificates = [google_compute_ssl_certificate.ml_ops_ssl_certificate.self_link]
+}
+
+resource "google_compute_address" "load_balancer_ip" {
+  name         = "load-balancer-ip"
+  project      = var.project_id
+  region       = var.region
+  address_type = "INTERNAL"
+  subnetwork   = google_compute_subnetwork.public_subnet.name
+}
+
+resource "google_compute_global_address" "default" {
+  name         = "mlops-global-ip"
+  address_type = "EXTERNAL"
+  ip_version   = "IPV4"
+  #network    = google_compute_network.mlops_vpc_network.id
+  depends_on = [google_project_service.enabled_services]
+}
+
+# Forwarding rule for HTTPS
+resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
+  name        = "https-forwarding-rule"
+  port_range  = "443"
+  ip_protocol = "TCP"
+
+  target     = google_compute_target_https_proxy.https_proxy.self_link
+  ip_address = google_compute_global_address.default.address
+}
+
+# -----------------------------------
+# GKE Deployment Cluster
+# -----------------------------------
 
 resource "google_container_cluster" "mlops_gke_cluster" {
   name     = "mlops-gke-cluster"
-  location = var.region
+  project  = var.project_id
+  location = var.region # zonal cluster - create one node only
+
+  enable_autopilot    = true
   deletion_protection = false
 
-  initial_node_count = 1  # Free tier setting
-  network  = google_compute_network.vpc_network.id
-  subnetwork = google_compute_subnetwork.private_subnet.id
+  initial_node_count = 1 # Free tier setting
+  network            = google_compute_network.mlops_vpc_network.id
+  subnetwork         = google_compute_subnetwork.private_subnet.id
 
-  release_channel {
-    channel = "REGULAR" # Choose from RAPID, REGULAR, or STABLE
+  lifecycle {
+    ignore_changes = [
+      node_locations,     # Ignore changes to the node_locations block
+      addons_config,      # Ignore changes to the addons_config block
+      node_config,        # Ignore changes to the node_config block
+      initial_node_count, # Ignore changes to the initial_node_count block
+      network,            # Ignore changes to the network block
+      subnetwork,         # Ignore changes to the subnetwork block
+    ]
   }
-
-  workload_identity_config {
-    workload_pool = "${var.project_id}.svc.id.goog"
-  }
-
-  # Enable network policy
-  network_policy {
-    enabled  = true
-    provider = "CALICO" # GKE supports CALICO for network policy
-  }
-
-  private_cluster_config {
-    enable_private_nodes    = true
-    enable_private_endpoint = false
-    master_ipv4_cidr_block  = "10.3.0.0/28"
-  }
-
-  # Enable Binary Authorization
-  binary_authorization {
-    evaluation_mode = "PROJECT_SINGLETON_POLICY_ENFORCE"
-  }
-
-  #authenticator_groups_config {
-  #  security_group = "mlops-service-accounts@ml-mentalhealth.iam.gserviceaccount.com"
-  #}
-
-  master_auth {
-    client_certificate_config {
-      issue_client_certificate = true # Disable client certificate authentication
+  addons_config {
+    http_load_balancing {
+      disabled = false # Enable HTTP load balancing for frontend
     }
   }
-
   node_config {
-    machine_type = "e2-small"  # Free tier-eligible
-    oauth_scopes = [
-      "https://www.googleapis.com/auth/cloud-platform"
-    ]
     service_account = google_service_account.mlops_service_account.email
-
-    workload_metadata_config {
-      mode = "GKE_METADATA" # Enable GKE Metadata Server
-    }
-    # Enable Secure Boot in Shielded Instance Config
-    shielded_instance_config {
-      enable_secure_boot          = true
-      enable_integrity_monitoring = true
-    }
-  }
-
-
-  # Add labels to the cluster
-  resource_labels = {
-    environment = "production"
-    team         = "devops"
-    project      = var.project_id
-  }
-
-  # Enable Master Authorized Networks
-  master_authorized_networks_config {
-    cidr_blocks {
-      cidr_block   = "192.168.1.0/24" # Replace with your trusted network
-      display_name = "Office Network"
-    }
-  }
-  # Enable Alias IP ranges
-  ip_allocation_policy {
-    cluster_secondary_range_name = "pods-range"    # Name of the secondary range for Pods
-    services_secondary_range_name = "services-range" # Name of the secondary range for Services
-  }
-
-}
-
-# Create a Node Pool for the GKE Cluster
-resource "google_container_node_pool" "primary_nodes" {
-  name       = "primary-node-pool"
-  cluster    = google_container_cluster.mlops_gke_cluster.name
-  location   = google_container_cluster.mlops_gke_cluster.location
-  initial_node_count = 1
-
-  autoscaling {
-    min_node_count = 1
-    max_node_count = 1
-  }
-
-  node_config {
-    machine_type = "e2-medium"
-    disk_size_gb = 50
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
   }
-  depends_on = [google_service_account.mlops_service_account ]
-}
-
-
-# ------------------------------------
-# Build pipeline.json
-# Pipeline will include preprocessing (feature store integration), training,
-# evaluation, model registration, and deployment steps
-# ------------------------------------
-
-resource "null_resource" "generate_pipeline_json" {
-
-  provisioner "local-exec" {
-    command = "python3 ../pipelines/pipeline.py"
-    working_dir = "${path.module}/../pipelines/"
-  }
-
-}
-
-resource "local_file" "pipeline_json" {
-  content  = <<EOT
-  {
-    "key": "value"
-  }
-  EOT
-  filename = "../pipelines/pipeline.json"
-}
-
-# ------------------------------------
-# Shared Data Storage for Pipeline
-# ------------------------------------
-resource "google_storage_bucket_object" "pipeline_json" {
-  name   = "pipeline.json"
-  bucket = google_storage_bucket.mlops_gcs_bucket.name
-  source = local_file.pipeline_json.filename
-
-  depends_on = [null_resource.generate_pipeline_json]
-
 }
 
 # --------------------------------------
-# CI/CD Pipeline - Automate application deployment
+# Automate application deployment
 #
-# This will be the CI/CD inititiator to build and deploy the Mental Health
-# MLOps Flask application. The destination instance will be in a GKE cluster
-# that is exposed to the public domain.
+# The following entries will be resources to build and deploy the Mental Health
+# MLOps Flask application.
+# Aside from creating a docker image for the app, the deployment also updates
+# the destination instance in a GKE cluster that serves the public domain.
 # --------------------------------------
 
-# Add a version to the secret (store the actual token value)
-resource "google_secret_manager_secret_version" "github_token" {
-  secret      = google_secret_manager_secret.github_token.id
-  secret_data = var.github_token  # Your GitHub token (mark as sensitive)
-}
+# We need a repository to store the Docker image
+# Note: GCR (Container Registry) is now called Artifact Registry
+resource "google_artifact_registry_repository" "mlops_repo" {
+  provider      = google
+  project       = var.project_id
+  location      = var.region
+  repository_id = "mlops-repo"
+  description   = "MLOps Docker Repository"
+  format        = "DOCKER"
 
-resource "google_secret_manager_secret" "github_token" {
-  secret_id = "github-token"  # Name of the secret in Secret Manager
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_iam_member" "cloudbuild_secret_access" {
-  secret_id = google_secret_manager_secret.github_token.id
-
-  role   = "roles/secretmanager.secretAccessor"
-  #member = "serviceAccount:cloud-build-editor@ml-mentalhealth.iam.gserviceaccount.com"
-  member    = "serviceAccount:service-${var.project_number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+  depends_on = [google_project_service.enabled_services["artifactregistry.googleapis.com"]]
 }
 
 # Create a Gen2 connection to GitHub
 resource "google_cloudbuildv2_connection" "github_connection" {
-  location = var.region  # Must be regional (e.g., "us-central1")
+  location = var.region # Must be regional (e.g., "us-central1")
   name     = "github-connection"
+
   github_config {
     app_installation_id = var.github_app_id
     authorizer_credential {
@@ -452,19 +521,28 @@ resource "google_cloudbuildv2_connection" "github_connection" {
     }
   }
 
+  lifecycle {
+    ignore_changes = all
+  }
+
   depends_on = [
+    google_project_service.enabled_services["cloudbuild.googleapis.com"],
+    google_secret_manager_secret_version.github_token,
     google_project_iam_member.mlops_permissions,
     google_secret_manager_secret_iam_member.cloudbuild_secret_access,
-    google_secret_manager_secret_version.github_token
   ]
 }
 
 # Link a GitHub repository to the connection
-resource "google_cloudbuildv2_repository" "ci_cd_repo" {
-  name             = "ci-cd-repo"
-  location         = "us-central1"
+resource "google_cloudbuildv2_repository" "mlops_app_repo" {
+  name              = "mlops-app-repo"
+  location          = "us-central1"
   parent_connection = google_cloudbuildv2_connection.github_connection.id
-  remote_uri       = "https://github.com/${var.github_user}/${var.github_repo}.git"
+  remote_uri        = "https://github.com/${var.github_user}/${var.github_repo}.git"
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # Generate the script to fetch the latest tag
@@ -486,7 +564,7 @@ resource "local_file" "get_latest_tag_script" {
 
 # Execute the script to get the latest tag
 data "external" "latest_tag" {
-  program = ["bash", local_file.get_latest_tag_script.filename, var.github_user, var.github_repo]
+  program    = ["bash", local_file.get_latest_tag_script.filename, var.github_user, var.github_repo]
   depends_on = [local_file.get_latest_tag_script]
 }
 # Use the fetched tag reference
@@ -494,22 +572,23 @@ locals {
   tag_ref = data.external.latest_tag.result.result # e.g., "refs/tags/v0.1.1"
 }
 
-resource "google_cloudbuild_trigger" "ci_cd_pipeline" {
-  name        = "ci-cd-deployment"
-  location    =  var.region
-  description = "CI/CD (Gen2) trigger for MLOps deployment from GitHub - with manual trigger support"
+# Listen to github for new tags, build and deploy the app with the new tag
+resource "google_cloudbuild_trigger" "mlops_app_github_trigger" {
+  name        = "mlops-app-github-trigger"
+  location    = var.region
+  description = "Trigger for MLOps deployment from GitHub - listen for new tags"
 
   # Gen2-specific configuration
   source_to_build {
-    uri       = "https://github.com/${var.github_user}/${var.github_repo}"
+    uri       = google_cloudbuildv2_repository.mlops_app_repo.id
     ref       = local.tag_ref # Latest tag (e.g., v0.1.1)
     repo_type = "GITHUB"
   }
 
   # Substitutions block for manual triggers
   substitutions = {
-    _PROJECT_ID = var.project_id
-    _IMAGE_TAG  = replace(local.tag_ref, "refs/tags/", "")
+    #_PROJECT_ID = var.project_id
+    _IMAGE_TAG = replace(local.tag_ref, "refs/tags/", "")
   }
 
   approval_config {
@@ -520,47 +599,322 @@ resource "google_cloudbuild_trigger" "ci_cd_pipeline" {
   # Build configuration (inline steps)
   build {
     options {
+      #logging = "CLOUD_LOGGING_ONLY"
       substitution_option = "ALLOW_LOOSE"  # Allow substitutions like ${_IMAGE_TAG}
       machine_type        = "N1_HIGHCPU_8" # Same as Gen1
     }
+    # Add logs bucket to store build logs
+    logs_bucket = "gs://mlops-gcs-bucket/cloud-build-logs/"
 
     # Step 1: Build Docker image
     step {
       name = "gcr.io/cloud-builders/docker"
       args = [
         "build",
-        "-t", "gcr.io/${var.project_id}/mlops-app:$${_IMAGE_TAG}", # Use substitution
+        "-t", "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:$${_IMAGE_TAG}", # Use Artifact Registry format
         "--build-arg", "ENV=prod",
         "."
       ]
+      wait_for = ["-"] # Wait for the build step to finish
     }
-
     # Step 2: Push Docker image to GCR
     step {
-      name = "gcr.io/cloud-builders/docker"
-      args = ["push", "gcr.io/${var.project_id}/mlops-app:$${_IMAGE_TAG}"]
+      name     = "gcr.io/cloud-builders/docker"
+      args     = ["push", "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:$${_IMAGE_TAG}"]
+      wait_for = ["-"] # Wait for the build step to finish
     }
-
     # Step 3: Update Kubernetes deployment
     step {
       name = "gcr.io/cloud-builders/kubectl"
       args = [
         "set", "image",
-        "deployment/mlops-model-serving",
-        "mlops-model=gcr.io/${var.project_id}/mlops-app:$${_IMAGE_TAG}"
+        "deployment/mlops-app-serving",
+        "mlops-app=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:$${_IMAGE_TAG}"
       ]
-      env  = [
+      env = [
         "CLOUDSDK_COMPUTE_ZONE=${google_container_cluster.mlops_gke_cluster.location}",
         "CLOUDSDK_CONTAINER_CLUSTER=${google_container_cluster.mlops_gke_cluster.name}"
       ]
+      wait_for = ["-"] # Wait for the push step to succeed
     }
-
     # Images to publish
-    images = ["gcr.io/${var.project_id}/mlops-app:$${_IMAGE_TAG}"]
+    images = ["${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:$${_IMAGE_TAG}"]
   }
 
   # Service account for kubectl (if needed)
   service_account = google_service_account.mlops_service_account.id
+}
+
+#  Run on terraform apply - Build and deploy the app with a given tag version.
+#   Conditions:
+#     Check if a variable tag value is provided;
+#     Check if the image for the given tag does not already exist in GCR
+resource "null_resource" "mlops_app_docker_build" {
+  provisioner "local-exec" {
+    command     = <<EOT
+      #!/bin/bash
+      set -e
+      IMAGE_ID=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}
+      rm -rf repo # Remove the repo if it exists
+
+      # Clone the GitHub repository
+      git clone ${google_cloudbuildv2_repository.mlops_app_repo.remote_uri} repo
+      cd repo
+
+      # Copy the .env file from the local system to the cloned repository
+      if [ -f "${var.env_file}" ]; then
+        cp "${var.env_file}" .env
+      else
+        echo "Warning: .env file not found at ${var.env_file}"
+      fi
+
+      # Copy the cert folder if it exists
+      if [ -d "${var.cert}" ]; then
+        cp -r "${var.cert}" ./cert
+      else
+        echo "Warning: cert folder not found at ${var.cert}"
+      fi
+
+      # Build the Docker image
+      docker build -t $IMAGE_ID  .
+
+      # Push the Docker image to GCR
+      docker push $IMAGE_ID
+    EOT
+    interpreter = ["/bin/bash", "-c"]
+  }
+}
+
+# -----------------------------------
+# Kubernetes Deployment
+# -----------------------------------
+
+resource "kubernetes_namespace" "mlops_app_namespace" {
+  metadata {
+    name = "mlops-app-namespace"
+  }
+
+  depends_on = [google_container_cluster.mlops_gke_cluster]
+}
+
+resource "kubernetes_service_account" "mlops_k8s_sa" {
+  metadata {
+    name      = "mlops-k8s-sa"
+    namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
+    annotations = {
+      "iam.gke.io/gcp-service-account" = google_service_account.mlops_service_account.email
+    }
+  }
+
+  depends_on = [kubernetes_namespace.mlops_app_namespace]
+}
+
+data "google_container_cluster" "mlops_gke_cluster" {
+  name     = google_container_cluster.mlops_gke_cluster.name
+  location = google_container_cluster.mlops_gke_cluster.location
+  project  = google_container_cluster.mlops_gke_cluster.project
+
+  depends_on = [google_container_cluster.mlops_gke_cluster]
+}
+
+data "google_compute_zones" "available_zones" {
+  project = var.project_id
+  region  = data.google_container_cluster.mlops_gke_cluster.location
+
+  depends_on = [google_project_service.compute]
+}
+
+# Kubernetes Frontend Service
+resource "kubernetes_service" "mlops_app_service" {
+  metadata {
+    name      = "mlops-app-service"
+    namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
+    annotations = {
+      "cloud.google.com/load-balancer-type" = "Internal"
+    }
+  }
+  spec {
+    selector = {
+      app = "mlops-app"
+    }
+    type = "ClusterIP"
+    port {
+      protocol    = "TCP"
+      port        = 8080 # public
+      target_port = 8080 # Internal container port
+    }
+  }
+}
+
+data "kubernetes_service" "mlops_app_service" {
+  metadata {
+    name      = kubernetes_service.mlops_app_service.metadata[0].name
+    namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
+  }
+  depends_on = [kubernetes_service.mlops_app_service]
+}
+
+locals {
+  neg_annotations = jsondecode(
+    lookup(
+      data.kubernetes_service.mlops_app_service.metadata[0].annotations != null ? data.kubernetes_service.mlops_app_service.metadata[0].annotations : {},
+      "cloud.google.com/neg-status",
+      "{}"
+    )
+  )
+}
+
+data "google_compute_network_endpoint_group" "neg" {
+  for_each = can(jsondecode(lookup(data.kubernetes_service.mlops_app_service.metadata[0].annotations, "cloud.google.com/neg-status", "{}"))["network_endpoint_groups"]["8080"]) ? toset(data.google_compute_zones.available_zones.names) : []
+  name     = local.neg_annotations["network_endpoint_groups"]["8080"]
+  zone     = each.key
+  project  = var.project_id
+}
+
+# Kubernetes Backend Deployment specs
+resource "google_compute_backend_service" "mlops_app_backend" {
+  name                  = "service-a-backend"
+  description           = "Backend for kubernetes service"
+  protocol              = "HTTP"
+  port_name             = "http"
+  load_balancing_scheme = "EXTERNAL"
+
+  dynamic "backend" {
+    for_each = data.google_compute_network_endpoint_group.neg
+    content {
+      group = backend.value.self_link
+    }
+  }
+}
+
+# Kubernetes Frontend Deployment specs
+resource "kubernetes_deployment" "mlops_app" {
+  metadata {
+    name      = "mlops-app-serving"
+    namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
+  }
+
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "mlops-app"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "mlops-app"
+        }
+      }
+      spec {
+        service_account_name = kubernetes_service_account.mlops_k8s_sa.metadata[0].name
+
+        container {
+          image = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}"
+          name  = "mlops-app"
+          port {
+            container_port = 8080
+          }
+          readiness_probe {
+            http_get {
+              path = "/"  # Replace with your app's readiness endpoint
+              port = 8080 # The container port to check
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 10
+          }
+          resources {
+            requests = {
+              cpu    = "100m"
+              memory = "128Mi"
+            }
+            limits = {
+              cpu    = "500m"
+              memory = "512Mi"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [
+    null_resource.mlops_app_docker_build,
+    kubernetes_service_account.mlops_k8s_sa
+  ]
+}
+
+# ###############################################
+# Vertex AI Related Resources follows
+# ###############################################
+
+# -----------------------------------
+# Cloud Storage (GCS) for Data Storage
+# -----------------------------------
+resource "google_storage_bucket" "mlops_gcs_bucket" {
+  name          = "mlops-gcs-bucket"
+  location      = var.region
+  force_destroy = true # Destroy all objects when bucket is destroyed
+
+  logging {
+    log_bucket        = "google_storage_bucket.log_bucket"
+    log_object_prefix = "gcs_access_logs"
+  }
+
+  storage_class = "STANDARD"
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age = 29 # Delete objects older than 29 days
+    }
+  }
+
+  public_access_prevention = "enforced"
+  #Enable uniform bucket-level access
+  uniform_bucket_level_access = true
+}
+
+# GCS Backend Service
+resource "google_compute_backend_bucket" "gcs_backend" {
+  name        = "gcs-backend-bucket"
+  bucket_name = google_storage_bucket.mlops_gcs_bucket.name
+}
+
+# ------------------------------------
+# Build pipeline.json
+# Pipeline will include preprocessing (feature store integration), training,
+# evaluation, model registration, and deployment steps
+# ------------------------------------
+
+resource "null_resource" "generate_pipeline_json" {
+  provisioner "local-exec" {
+    command     = "python3 ../pipelines/pipeline.py"
+    working_dir = "${path.module}/../pipelines/"
+  }
+}
+
+resource "local_file" "pipeline_json" {
+  content  = <<EOT
+  {
+    "key": "value"
+  }
+  EOT
+  filename = "../pipelines/pipeline.json"
+}
+
+# ------------------------------------
+# Shared Data Storage for Pipeline
+# ------------------------------------
+
+resource "google_storage_bucket_object" "pipeline_json" {
+  name   = "pipeline.json"
+  bucket = google_storage_bucket.mlops_gcs_bucket.name
+  source = local_file.pipeline_json.filename
+
+  depends_on = [null_resource.generate_pipeline_json]
 
 }
 
@@ -571,10 +925,10 @@ resource "google_cloudbuild_trigger" "ci_cd_pipeline" {
 # An executable function is needed to trigger the Vertex AI pipeline.
 # Here we use python trigger hosted in a Cloud Function.
 # First we need to get this function trigger uploaded to a
-# Cloud Storage bucket so the trigger 'trigger_pipeline' can reach
+# Cloud Storage bucket so that the trigger 'trigger_pipeline' can reach
 # it and run the program.
+#
 # Steps:
-
 # 1. Zip the function source files from the project directory
 #    on the development machine. The source files are located in
 #    cloud_functions/trigger_pipeline in the project directory.
@@ -592,15 +946,11 @@ resource "google_storage_bucket_object" "trigger_pipeline_zip" {
 }
 
 # 3. Create the Cloud Function to trigger the Vertex AI pipeline
-#resource "google_vertex_ai_pipeline" "pipeline" {
-#  display_name = "mlops-pipeline"
-#  template_uri = "gs://path-to-your-pipeline-template"
-#}
 # Workaround for the not supported (by TF) google_vertex_ai_pipeline"
 resource "google_cloudfunctions_function" "trigger_pipeline" {
-  name        = "trigger-vertex-pipeline"
-  runtime     = "python312"
-  entry_point = "trigger_pipeline" # The executable function to run
+  name                  = "trigger-vertex-pipeline"
+  runtime               = "python312"
+  entry_point           = "trigger_pipeline" # The executable function to run
   source_archive_bucket = google_storage_bucket.mlops_gcs_bucket.name
   source_archive_object = google_storage_bucket_object.trigger_pipeline_zip.name
   trigger_http          = true
@@ -619,43 +969,15 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
 }
 
 # -----------------------------------
-# Vertex AI Model Registry
-# -----------------------------------
-#resource "google_vertex_ai_model" "mlops_model_registry" {
-#  display_name = "mlops-registered-model"
-#  container_spec {
-#    image_uri = "gcr.io/path-to-your-prediction-image"
-#  }
-#}
-#resource "google_vertex_ai_model" "model" {
-#  display_name = "vertex-trained-model"
-#  region       = var.region
-#  labels = {
-#    environment = "prod"
-#  }
-#  artifact_uri = google_filestore_instance.filestore.file_shares[0].name
-#}
-# Workaround for the not supported google_vertex_ai_model"
-#resource "google_cloudfunctions_function" "register_model" {
-#  name        = "register-vertex-model"
-#  runtime     = "python310"
-#  entry_point = "register_model"
-#  source_archive_bucket = google_storage_bucket.data_storage.name
-#  source_archive_object = "functions/register_model.zip"
-#  trigger_http          = true
-#  available_memory_mb   = 256
-#  environment_variables = {
-#    PROJECT_ID = var.project_id
-#    REGION     = var.region
-#  }
-#}
-
-# -----------------------------------
 # Vertex AI Feature Store
 # -----------------------------------
 resource "google_vertex_ai_featurestore" "mlops_feature_store" {
-  name    = "mlops_feature_store"
-  region  = var.region
+  name   = "mlops_feature_store"
+  region = var.region
+
+  lifecycle {
+    ignore_changes = all
+  }
 
   depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
 }
@@ -668,64 +990,16 @@ resource "google_vertex_ai_endpoint" "endpoint" {
   display_name = "mlops-endpoint"
   location     = var.region
 
+  lifecycle {
+    ignore_changes = all
+  }
+
   depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
 }
-
-#resource "google_vertex_ai_model_deployment" "deployment" {
-#  endpoint_id = google_vertex_ai_endpoint.endpoint.id
-#  model_id    = google_vertex_ai_model.model.id
-#  traffic_split = {
-#    "0" = 100
-#  }
-#}
-# Workaround for the not supported google_vertex_ai_model_deployment"
-#resource "google_cloudfunctions_function" "deploy_model" {
-#  name        = "deploy-vertex-model"
-#  runtime     = "python310"
-#  entry_point = "deploy_model"
-#  source_archive_bucket = google_storage_bucket.data_storage.name
-#  source_archive_object = "functions/deploy_model.zip"
-#  trigger_http          = true
-#  available_memory_mb   = 256
-#  environment_variables = {
-#    PROJECT_ID = var.project_id
-#    REGION     = var.region
-#  }
-#}
-
-# Poor man's load balancer
-#resource "kubernetes_namespace" "mlops_model_namespace" {
-#  metadata {
-#    name = "mlops-model-namespace"
-#  }
-#
-#  depends_on = [google_container_cluster.mlops_gke_cluster]
-#}
-#
-## Kubernetes Service
-#resource "kubernetes_service" "mlops_model_service" {
-#  metadata {
-#    name      = "mlops-model-service"
-#    namespace = kubernetes_namespace.mlops_model_namespace.metadata[0].name
-#  }
-#  spec {
-#    selector = {
-#      app = "mlops-model"
-#    }
-#    type = "LoadBalancer"
-#    #type = "NodePort"
-#    port {
-#      port        = 80
-#      target_port = 8080
-#      node_port   = 30001
-#    }
-#  }
-#}
 
 # -----------------------------------
 # Pub/Sub for Alerts
 # -----------------------------------
-
 
 #resource "google_pubsub_topic" "alerts_topic" {
 #  name = "mlops-alerts"
@@ -744,11 +1018,6 @@ resource "google_monitoring_notification_channel" "email_channel" {
   }
 }
 
-#resource "google_vertex_ai_model_monitoring_job" "monitoring_job" {
-#  display_name = "mlops-monitoring-job"
-#  endpoint     = google_vertex_ai_endpoint.endpoint.id
-#}
-# Wrorkaround for the not supported google_vertex_ai_model_monitoring_job"
 resource "google_monitoring_alert_policy" "mlops_alert_policy" {
   display_name = "Vertex AI Monitoring Alert Policy"
   combiner     = "OR"
@@ -762,8 +1031,8 @@ resource "google_monitoring_alert_policy" "mlops_alert_policy" {
       duration        = "300s" # 5 minutes
 
       aggregations {
-        alignment_period    = "60s"
-        per_series_aligner  = "ALIGN_MEAN"
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_MEAN"
       }
     }
   }
@@ -777,54 +1046,69 @@ resource "google_monitoring_alert_policy" "mlops_alert_policy" {
     type        = "generic_alert"
   }
 
-  ## Prediction latency condition
-  #  conditions {
-  #  display_name = "Prediction Latency"
-  #  condition_threshold {
-  #    filter          = "resource.type=\"aiplatform.googleapis.com/Endpoint\" AND metric.type=\"aiplatform.googleapis.com/endpoint/prediction_latency\""
-  #    comparison      = "COMPARISON_GT"
-  #    threshold_value = 1000
-  #    duration        = "60s"
-
-  #    aggregations {
-  #      alignment_period    = "60s"
-  #      per_series_aligner  = "ALIGN_MEAN"
-  #    }
-  #  }
-  #}
-
-  ## Prediction errors condition
-  #conditions {
-  #  display_name    = "Prediction Errors"
-  #  condition_threshold {
-  #    filter          = "resource.type=\"aiplatform.googleapis.com/Model\" AND metric.type=\"cloudml.googleapis.com/endpoint/prediction_error_count\""
-  #    comparison      = "COMPARISON_GT"
-  #    threshold_value = 50
-  #    duration        = "60s"
-  #  }
-  #}
-
-  ## Drift monitoring condition (example using threshold violations)
-  #conditions {
-  #  display_name    = "Data Drift Violations"
-  #  condition_threshold {
-  #    filter          = "resource.type=\"aiplatform.googleapis.com/Model\" AND metric.type=\"cloudml.googleapis.com/endpoint/deployed_model/distance_threshold_violations\""
-  #    comparison      = "COMPARISON_GT"
-  #    threshold_value = 10
-  #    duration        = "300s"
-  #  }
-  #}
-
-  ## Feature attribution drift condition
-  #conditions {
-  #  display_name    = "Feature Attribution Drift"
-  #  condition_threshold {
-  #    filter          = "resource.type=\"aiplatform.googleapis.com/Model\" AND metric.type=\"cloudml.googleapis.com/endpoint/deployed_model/feature_attribution_score_drift\""
-  #    comparison      = "COMPARISON_GT"
-  #    threshold_value = 0.1
-  #    duration        = "300s"
-  #  }
-  #}
 }
 
+# -----------------------------------
+# PgSQL Database
+# -----------------------------------
+
+resource "google_compute_global_address" "private_ip_alloc" {
+  name          = "private-ip-alloc"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 20
+  network       = google_compute_network.mlops_vpc_network.id
+}
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.mlops_vpc_network.self_link
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_alloc.name]
+
+  #lifecycle {
+  #  ignore_changes = [reserved_peering_ranges]
+  #}
+
+  depends_on = [
+    google_compute_network.mlops_vpc_network,
+    google_compute_global_address.private_ip_alloc,
+    google_service_networking_connection.private_vpc_connection
+  ]
+}
+
+# Create Cloud SQL PostgreSQL Instance
+resource "google_sql_database_instance" "pg_instance" {
+  name                = "pg-instance"
+  database_version    = "POSTGRES_14"
+  region              = var.region
+  deletion_protection = false
+
+  settings {
+    tier            = "db-f1-micro" # Adjust as needed
+    disk_size       = 10
+    disk_autoresize = false
+
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = google_compute_network.mlops_vpc_network.id
+    }
+
+    backup_configuration {
+      enabled = false
+    }
+  }
+}
+
+# Create PostgreSQL Database
+resource "google_sql_database" "pg_database" {
+  name     = "pg-database"
+  instance = google_sql_database_instance.pg_instance.name
+}
+
+# Create PostgreSQL User (Secure via Secret Manager)
+resource "google_sql_user" "pg_user" {
+  name     = "postgres"
+  instance = google_sql_database_instance.pg_instance.name
+  password = "pgsql" # Store in Secret Manager instead
+}
 
