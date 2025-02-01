@@ -44,3 +44,6 @@ pipeline.json
 trigger_pipeline.zip
 *.out
 *.backup
+
+certs/*
+!certs/
