@@ -59,7 +59,6 @@ resource "google_service_account_iam_member" "allow_impersonation" {
   member             = "user:${var.email}"
 }
 
-
 # Create Service Account
 resource "google_service_account" "docker_auth" {
   account_id   = "docker-auth-sa"
@@ -405,6 +404,17 @@ resource "google_compute_security_policy" "cloud_armor" {
 
   name        = "cloud-armor"
   description = "Cloud Armor security policy"
+
+  rule {
+    action   = "allow"
+    priority = 1000
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["0.0.0.0/0"]  # Allow traffic from everywhere
+      }
+    }
+  }
 
   # An example of a security policy that blocks traffic from specific countries
   rule {
@@ -1025,6 +1035,13 @@ resource "google_storage_bucket" "mlops_gcs_bucket" {
   public_access_prevention    = "enforced"
   uniform_bucket_level_access = true
 }
+
+resource "google_storage_bucket_iam_member" "gcs_uploader" {
+  bucket = google_storage_bucket.mlops_gcs_bucket.name
+  role   = "roles/storage.objectCreator" # Allows file uploads
+  member = "serviceAccount:${google_service_account.mlops_service_account.email}"
+}
+
 
 # GCS Backend Service
 resource "google_compute_backend_bucket" "gcs_backend" {
