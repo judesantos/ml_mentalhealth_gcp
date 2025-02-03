@@ -147,6 +147,13 @@ Check logs for specific errors using:
     terraform show
 ```
 
+### Update mlops_app image
+Triggers the creation of a new image and pushes to the artifact registry.
+Any changes in the terraform configuration will also be updated.
+```
+terraform apply -replace=null_resource.mlops_app_docker_build
+```
+
 
 
 

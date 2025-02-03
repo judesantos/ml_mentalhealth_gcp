@@ -89,3 +89,8 @@ output "docker_key_file" {
 output "available_zones" {
   value = data.google_compute_zones.available_zones.names
 }
+
+output "database_url" {
+  value     = kubernetes_secret.mlops_app_secret.data["DATABASE_URL"]
+  sensitive = true
+}

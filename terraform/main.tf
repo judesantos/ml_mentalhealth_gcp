@@ -75,12 +75,6 @@ resource "google_service_account_key" "docker_auth_key" {
 }
 
 # Grant Permissions for Service Account
-#resource "google_project_iam_member" "artifact_registry_access" {
-#  project = var.project_id
-#  role    = "roles/artifactregistry.writer" # For Artifact Registry
-#  member  = "serviceAccount:${google_service_account.docker_auth.email}"
-#
-#}
 resource "google_project_iam_member" "artifact_registry_access" {
   project = var.project_id
 
@@ -279,6 +273,16 @@ resource "google_compute_subnetwork" "private_subnet" {
 
   ip_cidr_range            = "10.0.2.0/24"
   private_ip_google_access = true
+
+  secondary_ip_range {
+    range_name    = "pods-range"
+    ip_cidr_range = "10.20.0.0/20"  # Allocates IPs for GKE Pods
+  }
+
+  secondary_ip_range {
+    range_name    = "services-range"
+    ip_cidr_range = "10.20.16.0/20"  # Allocates IPs for GKE Services
+  }
 }
 
 # -----------------------------------
@@ -309,10 +313,10 @@ resource "google_compute_firewall" "allow_internal" {
 
   allow {
     protocol = "tcp"
-    ports    = ["0-65535"]
+    ports    = ["0-65535"] # all ports inside the vpc
   }
 
-  source_ranges = ["10.0.0.0/16"]
+  source_ranges = ["10.0.0.0/16"] # Internal network
 }
 
 resource "google_compute_firewall" "allow_external" {
@@ -321,18 +325,16 @@ resource "google_compute_firewall" "allow_external" {
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "8080", "443"]
+    ports    = ["443"]
   }
 
   source_ranges = ["0.0.0.0/0"]
   direction     = "INGRESS"
-  target_tags   = ["ssh-access"]
 
   priority = 1000 # Lower number the higher the priority
-
-  #source_ranges = ["0.0.0.0/0"]
 }
 
+# Office network access to the Kubernetes API
 resource "google_compute_firewall" "allow_k8s_api" {
   name    = "allow-k8s-api"
   network = google_compute_network.mlops_vpc_network.name
@@ -345,11 +347,12 @@ resource "google_compute_firewall" "allow_k8s_api" {
     ports    = ["443"]
   }
 
-  target_tags   = ["private-subnet"]
-  source_ranges = ["192.168.1.0/24"] # Only your office network
+  #target_tags   = ["private-subnet"]
+  source_ranges = ["192.168.1.0/24"] # Allow the office network
   description   = "Allow Kubernetes API access from office network"
 }
 
+# This rule allows egress traffic from GKE to the internet on port 443
 resource "google_compute_firewall" "allow_egress_to_api" {
   name    = "allow-egress-to-api"
   network = google_compute_network.mlops_vpc_network.name
@@ -366,6 +369,29 @@ resource "google_compute_firewall" "allow_egress_to_api" {
     metadata = "INCLUDE_ALL_METADATA"
   }
   destination_ranges = ["0.0.0.0/0"] # Allow egress to any destination
+}
+
+# This rule allows HTTPS traffic from the Load Balancer to the GKE pods
+resource "google_compute_firewall" "allow_lb_to_gke" {
+  name    = "allow-lb-to-gke"
+  description   = "Allow HTTPS traffic from Load Balancer to GKE"
+
+  direction = "INGRESS"
+  priority  = 900  # Higher priority than default rules
+  network = google_compute_network.mlops_vpc_network.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]  # Allow HTTPS traffic to GKE pods
+  }
+
+  source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]  # GCP Load Balancer IP ranges
+  # Allow ingress to all GKE nodes in the VPC
+  destination_ranges = [
+    "10.0.2.0/24",      # GKE Subnet (private subnet)
+    "10.20.0.0/20",     # GKE Pods CIDR
+    "10.20.16.0/20"     # GKE Services CIDR
+  ]
 }
 
 # -----------------------------------
@@ -459,6 +485,7 @@ resource "google_container_cluster" "mlops_gke_cluster" {
 
   enable_autopilot    = true
   deletion_protection = false
+  networking_mode = "VPC_NATIVE"
 
   initial_node_count = 1 # Free tier setting
   network            = google_compute_network.mlops_vpc_network.id
@@ -474,6 +501,17 @@ resource "google_container_cluster" "mlops_gke_cluster" {
       subnetwork,         # Ignore changes to the subnetwork block
     ]
   }
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "pods-range"
+    services_secondary_range_name = "services-range"
+  }
+
+  private_cluster_config {  # Ensures the cluster is private
+    enable_private_nodes    = true
+    enable_private_endpoint = false
+    master_ipv4_cidr_block  = "172.16.0.0/28"
+  }
+
   addons_config {
     http_load_balancing {
       disabled = false # Enable HTTP load balancing for frontend
@@ -587,7 +625,6 @@ resource "google_cloudbuild_trigger" "mlops_app_github_trigger" {
 
   # Substitutions block for manual triggers
   substitutions = {
-    #_PROJECT_ID = var.project_id
     _IMAGE_TAG = replace(local.tag_ref, "refs/tags/", "")
   }
 
@@ -687,7 +724,7 @@ resource "null_resource" "mlops_app_docker_build" {
       docker builder prune --all
 
       # Build the Docker image according to GCP platform specifications
-      docker buildx build --no-cache --platform=linux/amd64 -t $IMAGE_ID  .
+      DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 -t $IMAGE_ID .
 
       # Push the Docker image to GCR
       docker push $IMAGE_ID
@@ -703,6 +740,16 @@ resource "null_resource" "mlops_app_docker_build" {
 # -----------------------------------
 # Kubernetes Deployment
 # -----------------------------------
+
+# Issue: Workload Identity Not Applied (Empty IAM Policy)
+resource "google_service_account_iam_binding" "mlops_workload_identity" {
+  service_account_id = google_service_account.mlops_service_account.name
+  role               = "roles/iam.workloadIdentityUser"
+
+  members = [
+    "serviceAccount:${var.project_id}.svc.id.goog[mlops-app-namespace/mlops-k8s-sa]"
+  ]
+}
 
 resource "kubernetes_namespace" "mlops_app_namespace" {
   metadata {
@@ -721,7 +768,7 @@ resource "kubernetes_service_account" "mlops_k8s_sa" {
     }
   }
 
-  depends_on = [kubernetes_namespace.mlops_app_namespace]
+  depends_on = [google_service_account.mlops_service_account]
 }
 
 data "google_container_cluster" "mlops_gke_cluster" {
@@ -745,18 +792,18 @@ resource "kubernetes_service" "mlops_app_service" {
     name      = "mlops-app-service"
     namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
     annotations = {
-      "cloud.google.com/load-balancer-type" = "Internal"
+      "cloud.google.com/load-balancer-type" = "External"
     }
   }
   spec {
     selector = {
       app = "mlops-app"
     }
-    type = "ClusterIP"
+    type = "LoadBalancer"
     port {
       protocol    = "TCP"
-      port        = 8080 # public
-      target_port = 8080 # Internal container port
+      port        = 443 # public
+      target_port = 443 # Internal container port
     }
   }
 }
@@ -790,8 +837,8 @@ data "google_compute_network_endpoint_group" "neg" {
 resource "google_compute_backend_service" "mlops_app_backend" {
   name                  = "service-a-backend"
   description           = "Backend for kubernetes service"
-  protocol              = "HTTP"
-  port_name             = "http"
+  protocol              = "HTTPS"
+  port_name             = "https"
   load_balancing_scheme = "EXTERNAL"
 
   dynamic "backend" {
@@ -826,18 +873,10 @@ resource "kubernetes_deployment" "mlops_app" {
         service_account_name = kubernetes_service_account.mlops_k8s_sa.metadata[0].name
 
         container {
-          image = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}"
           name  = "mlops-app"
+          image = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}"
           port {
-            container_port = 8080
-          }
-          readiness_probe {
-            http_get {
-              path = "/"  # Replace with your app's readiness endpoint
-              port = 8080 # The container port to check
-            }
-            initial_delay_seconds = 5
-            period_seconds        = 10
+            container_port = 443
           }
           resources {
             requests = {
@@ -849,12 +888,22 @@ resource "kubernetes_deployment" "mlops_app" {
               memory = "512Mi"
             }
           }
+          env {
+            name = "DATABASE_URL"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.mlops_app_secret.metadata[0].name
+                key  = "DATABASE_URL"
+              }
+            }
+          }
         }
       }
     }
   }
 
   depends_on = [
+    google_sql_database.pg_database,
     null_resource.mlops_app_docker_build,
     kubernetes_service_account.mlops_k8s_sa
   ]
@@ -888,7 +937,6 @@ resource "google_storage_bucket" "mlops_gcs_bucket" {
   }
 
   public_access_prevention = "enforced"
-  #Enable uniform bucket-level access
   uniform_bucket_level_access = true
 }
 
@@ -1060,7 +1108,6 @@ resource "google_monitoring_alert_policy" "mlops_alert_policy" {
     environment = "production"
     type        = "generic_alert"
   }
-
 }
 
 # -----------------------------------
@@ -1109,7 +1156,7 @@ resource "google_sql_database_instance" "pg_instance" {
     }
   }
 
-  depends_on = [google_service_networking_connection.vpc_peering]
+  depends_on = [google_service_networking_connection.private_vpc_connection]
 }
 
 # Create PostgreSQL Database
@@ -1125,3 +1172,17 @@ resource "google_sql_user" "pg_user" {
   password = "pgsql" # Store in Secret Manager instead
 }
 
+data "google_sql_database_instance" "pg_instance" {
+  name = google_sql_database_instance.pg_instance.name
+}
+
+resource "kubernetes_secret" "mlops_app_secret" {
+  metadata {
+    name      = "mlops-app-secret"
+    namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
+  }
+
+  data = {
+    DATABASE_URL = "postgresql://postgres:pgsql@${data.google_sql_database_instance.pg_instance.private_ip_address}:5432/pg-database"
+  }
+}
