@@ -35,8 +35,6 @@ resource "google_project_iam_member" "mlops_permissions" {
     "roles/cloudbuild.builds.editor",
     "roles/cloudbuild.builds.builder",
     "roles/cloudbuild.builds.viewer",
-    #"roles/artifactregistry.writer",
-    #"roles/artifactregistry.reader",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
     "roles/resourcemanager.projectIamAdmin",
@@ -89,8 +87,10 @@ resource "google_project_iam_member" "artifact_registry_access" {
   depends_on = [google_service_account.mlops_service_account]
 }
 
-# Login to Docker Registry for the mlop_app deployment in GKE cluster -
-# Pushes the image to GCR then pulls it in the GKE cluster
+/*
+  Login to Docker Registry for the mlop_app deployment in GKE cluster -
+  Pushes the image to GCR then pulls it in the GKE cluster
+*/
 resource "null_resource" "docker_auth" {
   provisioner "local-exec" {
     command = "echo '${base64decode(google_service_account_key.docker_auth_key.private_key)}' | docker login -u _json_key --password-stdin https://gcr.io"
@@ -114,9 +114,11 @@ resource "google_secret_manager_secret_version" "github_token" {
   secret_data = var.github_token # Your GitHub token (mark as sensitive)
 }
 
-# The service account serviceAccount:service-416879185829@g* is somehow
-# expected by cloud build, we need to create it and give it the necessary
-# permissions for the github connection to work.
+/*
+  The service account serviceAccount:service-416879185829@g* is somehow
+  expected by cloud build, we need to create it and give it the necessary
+  permissions for the github connection to work.
+*/
 resource "google_secret_manager_secret_iam_member" "github_token_accessor" {
   secret_id = "github-token"
   role      = "roles/secretmanager.secretAccessor"
@@ -143,7 +145,6 @@ resource "google_project_service" "iam" {
   service = "iam.googleapis.com"
   project = var.project_id
 }
-
 
 resource "google_project_service" "serviceusage" {
   project                    = var.project_id
@@ -276,12 +277,12 @@ resource "google_compute_subnetwork" "private_subnet" {
 
   secondary_ip_range {
     range_name    = "pods-range"
-    ip_cidr_range = "10.20.0.0/20"  # Allocates IPs for GKE Pods
+    ip_cidr_range = "10.20.0.0/20" # Allocates IPs for GKE Pods
   }
 
   secondary_ip_range {
     range_name    = "services-range"
-    ip_cidr_range = "10.20.16.0/20"  # Allocates IPs for GKE Services
+    ip_cidr_range = "10.20.16.0/20" # Allocates IPs for GKE Services
   }
 }
 
@@ -373,24 +374,24 @@ resource "google_compute_firewall" "allow_egress_to_api" {
 
 # This rule allows HTTPS traffic from the Load Balancer to the GKE pods
 resource "google_compute_firewall" "allow_lb_to_gke" {
-  name    = "allow-lb-to-gke"
-  description   = "Allow HTTPS traffic from Load Balancer to GKE"
+  name        = "allow-lb-to-gke"
+  description = "Allow HTTPS traffic from Load Balancer to GKE"
 
   direction = "INGRESS"
-  priority  = 900  # Higher priority than default rules
-  network = google_compute_network.mlops_vpc_network.name
+  priority  = 900 # Higher priority than default rules
+  network   = google_compute_network.mlops_vpc_network.name
 
   allow {
     protocol = "tcp"
-    ports    = ["443"]  # Allow HTTPS traffic to GKE pods
+    ports    = ["443"] # Allow HTTPS traffic to GKE pods
   }
 
-  source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]  # GCP Load Balancer IP ranges
+  source_ranges = ["130.211.0.0/22", "35.191.0.0/16"] # GCP Load Balancer IP ranges
   # Allow ingress to all GKE nodes in the VPC
   destination_ranges = [
-    "10.0.2.0/24",      # GKE Subnet (private subnet)
-    "10.20.0.0/20",     # GKE Pods CIDR
-    "10.20.16.0/20"     # GKE Services CIDR
+    "10.0.2.0/24",  # GKE Subnet (private subnet)
+    "10.20.0.0/20", # GKE Pods CIDR
+    "10.20.16.0/20" # GKE Services CIDR
   ]
 }
 
@@ -398,11 +399,43 @@ resource "google_compute_firewall" "allow_lb_to_gke" {
 # Cloud Armor Security Policy
 # -----------------------------------
 
+# Public load balancer protection.
 resource "google_compute_security_policy" "cloud_armor" {
   project = var.project_id
 
   name        = "cloud-armor"
   description = "Cloud Armor security policy"
+
+  # An example of a security policy that blocks traffic from specific countries
+  rule {
+    action   = "deny(403)"
+    priority = 1000
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["CN", "RU"]
+      }
+    }
+    description = "Block traffic from listed countries"
+  }
+  # An example of a security policy that blocks common OWASP threats:
+  #   XSS, SQLi, and other web based attacks
+  rule {
+    action   = "deny(403)"
+    priority = 500
+    match {
+      expr {
+        expression = "evaluatePreconfiguredWaf('owasp-crs-v030001-level1')"
+      }
+    }
+    description = "Block common OWASP threats"
+  }
+  # An example of a security policy that prevents DDoS attacks
+  adaptive_protection_config {
+    layer_7_ddos_defense_config {
+      enable = true
+    }
+  }
 
   depends_on = [
     google_project_iam_member.mlops_permissions,
@@ -410,11 +443,21 @@ resource "google_compute_security_policy" "cloud_armor" {
   ]
 }
 
+# Enable logging for Cloud Armor
+resource "null_resource" "enable_cloud_armor_logging" {
+  provisioner "local-exec" {
+    command = "gcloud compute security-policies update cloud-armor-policy --enable-logging"
+  }
+
+  # Only run this after the security policy is created
+  depends_on = [google_compute_security_policy.cloud_armor]
+}
+
 # -----------------------------------
 # Load Balancer
 # -----------------------------------
 
-# Routing for the load balancer
+# Public subnet load balancer - The gateway to the VPC private subnet
 resource "google_compute_url_map" "url_map" {
   name = "multi-backend-url-map"
 
@@ -429,25 +472,25 @@ resource "google_compute_url_map" "url_map" {
     name            = "mlops-app"
     default_service = google_compute_backend_service.mlops_app_backend.self_link
 
+    # Separate path rules for different services
     path_rule {
       paths   = ["/*"]
       service = google_compute_backend_service.mlops_app_backend.self_link
     }
+    # TODO: Add vertex AI endpoint path rules here
   }
 }
 
-resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
-  name        = "mlops-ssl-certificate"
-  private_key = file("../certs/app_private_key.pem")
-  certificate = file("../certs/app_certificate.pem")
+# Load balancer public IP address for incoming traffic
+resource "google_compute_global_address" "default" {
+  name         = "mlops-global-ip"
+  address_type = "EXTERNAL"
+  ip_version   = "IPV4"
+  depends_on   = [google_project_service.enabled_services]
 }
 
-resource "google_compute_target_https_proxy" "https_proxy" {
-  name             = "https-proxy"
-  url_map          = google_compute_url_map.url_map.self_link
-  ssl_certificates = [google_compute_ssl_certificate.ml_ops_ssl_certificate.self_link]
-}
-
+# TODO: Looks like this is not used. Remove if not needed
+# Load balancer private IP address for internal traffic
 resource "google_compute_address" "load_balancer_ip" {
   name         = "load-balancer-ip"
   project      = var.project_id
@@ -456,15 +499,40 @@ resource "google_compute_address" "load_balancer_ip" {
   subnetwork   = google_compute_subnetwork.public_subnet.name
 }
 
-resource "google_compute_global_address" "default" {
-  name         = "mlops-global-ip"
-  address_type = "EXTERNAL"
-  ip_version   = "IPV4"
-  #network    = google_compute_network.mlops_vpc_network.id
-  depends_on = [google_project_service.enabled_services]
+/*
+  Custom domain SSL certificate - Why we need a global forwarding rule:
+  - The public-facing load balancer must terminate HTTPS connections.
+  - GCP Load Balancers do not automatically generate SSL certificates
+      (unless using a Managed SSL Certificate, i.e.: Using google domains).
+  - Using our own custom domain and TLS certificate,
+      we provide our own SSL certificate.
+*/
+resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
+  name        = "mlops-ssl-certificate"
+  private_key = file("../certs/app_private_key.pem")
+  certificate = file("../certs/app_certificate.pem")
 }
 
-# Forwarding rule for HTTPS
+/*
+  The Global Load Balancer uses a proxy to handle HTTPS traffic.
+  The proxy terminates HTTPS connections (decrypts SSL) before forwarding
+  traffic to backend services (GKE, Vertex AI, etc.).
+  It links the SSL certificate and the URL map (which defines how traffic
+  is routed to backends).
+  Without this, the load balancer would not be able to serve HTTPS traffic.
+*/
+resource "google_compute_target_https_proxy" "https_proxy" {
+  name             = "https-proxy"
+  url_map          = google_compute_url_map.url_map.self_link
+  ssl_certificates = [google_compute_ssl_certificate.ml_ops_ssl_certificate.self_link]
+}
+
+/*
+  This is what actually assigns the public IP to the Load Balancer.
+  It listens for incoming traffic on port 443 (HTTPS).
+  It forwards traffic to the HTTPS proxy (google_compute_target_https_proxy).
+  Without this, the load balancer can not receive external requests.
+*/
 resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
   name        = "https-forwarding-rule"
   port_range  = "443"
@@ -478,6 +546,7 @@ resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
 # GKE Deployment Cluster
 # -----------------------------------
 
+# The GKE cluster
 resource "google_container_cluster" "mlops_gke_cluster" {
   name     = "mlops-gke-cluster"
   project  = var.project_id
@@ -485,7 +554,7 @@ resource "google_container_cluster" "mlops_gke_cluster" {
 
   enable_autopilot    = true
   deletion_protection = false
-  networking_mode = "VPC_NATIVE"
+  networking_mode     = "VPC_NATIVE" # Ensure GKE is in the private subnetwork
 
   initial_node_count = 1 # Free tier setting
   network            = google_compute_network.mlops_vpc_network.id
@@ -506,7 +575,7 @@ resource "google_container_cluster" "mlops_gke_cluster" {
     services_secondary_range_name = "services-range"
   }
 
-  private_cluster_config {  # Ensures the cluster is private
+  private_cluster_config { # Ensures the cluster is private
     enable_private_nodes    = true
     enable_private_endpoint = false
     master_ipv4_cidr_block  = "172.16.0.0/28"
@@ -534,8 +603,10 @@ resource "google_container_cluster" "mlops_gke_cluster" {
 # the destination instance in a GKE cluster that serves the public domain.
 # --------------------------------------
 
-# We need a repository to store the Docker image
-# Note: GCR (Container Registry) is now called Artifact Registry
+/*
+  We need a repository to store the Docker image
+  Note: GCR (Container Registry) is now called Artifact Registry
+*/
 resource "google_artifact_registry_repository" "mlops_repo" {
   provider      = google
   project       = var.project_id
@@ -583,7 +654,7 @@ resource "google_cloudbuildv2_repository" "mlops_app_repo" {
   }
 }
 
-# Generate the script to fetch the latest tag
+# Generate the script to fetch the latest git tag
 resource "local_file" "get_latest_tag_script" {
   filename = "${path.module}/get_latest_tag.sh"
   content  = <<-EOT
@@ -682,10 +753,15 @@ resource "google_cloudbuild_trigger" "mlops_app_github_trigger" {
   service_account = google_service_account.mlops_service_account.id
 }
 
-#  Run on terraform apply - Build and deploy the app with a given tag version.
-#   Conditions:
-#     Check if a variable tag value is provided;
-#     Check if the image for the given tag does not already exist in GCR
+/*
+  Run on terraform apply - Build and deploy the app with a given tag version.
+  Conditions:
+    Check if a variable tag value is provided;
+    Check if the image for the given tag does not already exist in GCR
+  NOTE: This may conflict with the GitHub trigger, 'mlops_app_github_trigger'.
+        Use only when retrying a failed deployment, or when the VPC is
+        created for the first time and a tag is provided in the variables.
+*/
 resource "null_resource" "mlops_app_docker_build" {
   provisioner "local-exec" {
     command     = <<EOT
@@ -698,6 +774,7 @@ resource "null_resource" "mlops_app_docker_build" {
       # Clone the GitHub repository with the given tag
       git clone --branch ${var.image_tag} --depth 1 ${google_cloudbuildv2_repository.mlops_app_repo.remote_uri} repo
 
+      # Get the absolute path of the .env file and cert folder
       ENV_FILE_PATH=$(realpath "${var.env_file}")
       CERT_FOLDER_PATH=$(realpath "${var.cert}")
 
@@ -741,16 +818,6 @@ resource "null_resource" "mlops_app_docker_build" {
 # Kubernetes Deployment
 # -----------------------------------
 
-# Issue: Workload Identity Not Applied (Empty IAM Policy)
-resource "google_service_account_iam_binding" "mlops_workload_identity" {
-  service_account_id = google_service_account.mlops_service_account.name
-  role               = "roles/iam.workloadIdentityUser"
-
-  members = [
-    "serviceAccount:${var.project_id}.svc.id.goog[mlops-app-namespace/mlops-k8s-sa]"
-  ]
-}
-
 resource "kubernetes_namespace" "mlops_app_namespace" {
   metadata {
     name = "mlops-app-namespace"
@@ -771,6 +838,21 @@ resource "kubernetes_service_account" "mlops_k8s_sa" {
   depends_on = [google_service_account.mlops_service_account]
 }
 
+/*
+  Resolves Issue: Workload Identity Not Applied (Empty IAM Policy)
+  Requres the specific role to be assigned to the service account used
+  specifically for GKE clusters.
+ */
+resource "google_service_account_iam_binding" "mlops_workload_identity" {
+  service_account_id = google_service_account.mlops_service_account.name
+  role               = "roles/iam.workloadIdentityUser"
+
+  members = [
+    "serviceAccount:${var.project_id}.svc.id.goog[mlops-app-namespace/mlops-k8s-sa]"
+  ]
+}
+
+# The GKE cluster metadata
 data "google_container_cluster" "mlops_gke_cluster" {
   name     = google_container_cluster.mlops_gke_cluster.name
   location = google_container_cluster.mlops_gke_cluster.location
@@ -847,6 +929,9 @@ resource "google_compute_backend_service" "mlops_app_backend" {
       group = backend.value.self_link
     }
   }
+
+  # Attach Cloud Armor
+  security_policy = google_compute_security_policy.cloud_armor.id
 }
 
 # Kubernetes Frontend Deployment specs
@@ -909,13 +994,14 @@ resource "kubernetes_deployment" "mlops_app" {
   ]
 }
 
-# ###############################################
-# Vertex AI Related Resources follows
-# ###############################################
+/*
+  Vertex AI Related Resources follows
+*/
 
 # -----------------------------------
 # Cloud Storage (GCS) for Data Storage
 # -----------------------------------
+
 resource "google_storage_bucket" "mlops_gcs_bucket" {
   name          = "mlops-gcs-bucket"
   location      = var.region
@@ -936,7 +1022,7 @@ resource "google_storage_bucket" "mlops_gcs_bucket" {
     }
   }
 
-  public_access_prevention = "enforced"
+  public_access_prevention    = "enforced"
   uniform_bucket_level_access = true
 }
 
@@ -946,12 +1032,11 @@ resource "google_compute_backend_bucket" "gcs_backend" {
   bucket_name = google_storage_bucket.mlops_gcs_bucket.name
 }
 
-# ------------------------------------
-# Build pipeline.json
-# Pipeline will include preprocessing (feature store integration), training,
-# evaluation, model registration, and deployment steps
-# ------------------------------------
-
+/*
+  Build pipeline.json
+  Pipeline will include preprocessing (feature store integration), training,
+  evaluation, model registration, and deployment steps
+*/
 resource "null_resource" "generate_pipeline_json" {
   provisioner "local-exec" {
     command     = "python3 ../pipelines/pipeline.py"
@@ -985,16 +1070,18 @@ resource "google_storage_bucket_object" "pipeline_json" {
 # Vertex AI Pipelines
 # -----------------------------------
 
-# An executable function is needed to trigger the Vertex AI pipeline.
-# Here we use python trigger hosted in a Cloud Function.
-# First we need to get this function trigger uploaded to a
-# Cloud Storage bucket so that the trigger 'trigger_pipeline' can reach
-# it and run the program.
-#
-# Steps:
-# 1. Zip the function source files from the project directory
-#    on the development machine. The source files are located in
-#    cloud_functions/trigger_pipeline in the project directory.
+/*
+  An executable function is needed to trigger the Vertex AI pipeline.
+  Here we use python trigger hosted in a Cloud Function.
+  First we need to get this function trigger uploaded to a
+  Cloud Storage bucket so that the trigger 'trigger_pipeline' can reach
+  it and run the program.
+
+  Steps:
+  1. Zip the function source files from the project directory
+      on the development machine. The source files are located in
+      cloud_functions/trigger_pipeline in the project directory.
+*/
 resource "archive_file" "trigger_pipeline_zip" {
   type        = "zip"
   source_dir  = "../cloud_functions/trigger_pipeline"
@@ -1008,8 +1095,10 @@ resource "google_storage_bucket_object" "trigger_pipeline_zip" {
   source = archive_file.trigger_pipeline_zip.output_path
 }
 
-# 3. Create the Cloud Function to trigger the Vertex AI pipeline
-# Workaround for the not supported (by TF) google_vertex_ai_pipeline"
+/*
+  3. Create the Cloud Function to trigger the Vertex AI pipeline
+  Workaround for the not supported (by TF) google_vertex_ai_pipeline"
+*/
 resource "google_cloudfunctions_function" "trigger_pipeline" {
   name                  = "trigger-vertex-pipeline"
   runtime               = "python312"
@@ -1034,6 +1123,7 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
 # -----------------------------------
 # Vertex AI Feature Store
 # -----------------------------------
+
 resource "google_vertex_ai_featurestore" "mlops_feature_store" {
   name   = "mlops_feature_store"
   region = var.region
@@ -1048,6 +1138,7 @@ resource "google_vertex_ai_featurestore" "mlops_feature_store" {
 # -----------------------------------
 # Vertex AI Endpoint
 # -----------------------------------
+
 resource "google_vertex_ai_endpoint" "endpoint" {
   name         = "mlops-endpoint"
   display_name = "mlops-endpoint"
@@ -1167,22 +1258,23 @@ resource "google_sql_database" "pg_database" {
 
 # Create PostgreSQL User (Secure via Secret Manager)
 resource "google_sql_user" "pg_user" {
-  name     = "postgres"
+  name     = var.pgsql_user
   instance = google_sql_database_instance.pg_instance.name
-  password = "pgsql" # Store in Secret Manager instead
+  password = var.pgsql_user # Store in Secret Manager instead
 }
 
+# Create the SQL DB instance
 data "google_sql_database_instance" "pg_instance" {
   name = google_sql_database_instance.pg_instance.name
 }
 
+# Provide the database URL as a secret
 resource "kubernetes_secret" "mlops_app_secret" {
   metadata {
     name      = "mlops-app-secret"
     namespace = kubernetes_namespace.mlops_app_namespace.metadata[0].name
   }
-
   data = {
-    DATABASE_URL = "postgresql://postgres:pgsql@${data.google_sql_database_instance.pg_instance.private_ip_address}:5432/pg-database"
+    DATABASE_URL = "postgresql://${var.pgsql_user}:${var.pgsql_password}@${data.google_sql_database_instance.pg_instance.private_ip_address}:5432/pg-database"
   }
 }

@@ -57,3 +57,13 @@ variable "cert" {
   type        = string
 }
 
+variable "pgsql_user" {
+  description = "PostgreSQL username"
+  type        = string
+}
+
+variable "pgsql_password" {
+  description = "PostgreSQL password"
+  type        = string
+  sensitive   = true
+}
