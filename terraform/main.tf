@@ -405,62 +405,55 @@ resource "google_compute_security_policy" "cloud_armor" {
   name        = "cloud-armor"
   description = "Cloud Armor security policy"
 
-  rule {
-    action   = "allow"
-    priority = 1000
-    match {
-      versioned_expr = "SRC_IPS_V1"
-      config {
-        src_ip_ranges = ["0.0.0.0/0"]  # Allow traffic from everywhere
-      }
-    }
-  }
-
-  # An example of a security policy that blocks traffic from specific countries
+  # Security policy - blocks traffic from specific countries
   rule {
     action   = "deny(403)"
     priority = 1000
     match {
-      versioned_expr = "SRC_IPS_V1"
-      config {
-        src_ip_ranges = ["CN", "RU"]
+      expr {
+        expression = "origin.region_code == 'CN' || origin.region_code == 'RU'"
       }
     }
     description = "Block traffic from listed countries"
   }
-  # An example of a security policy that blocks common OWASP threats:
+
+  # Security policy - blocks common OWASP threats:
   #   XSS, SQLi, and other web based attacks
-  rule {
-    action   = "deny(403)"
-    priority = 500
-    match {
-      expr {
-        expression = "evaluatePreconfiguredWaf('owasp-crs-v030001-level1')"
-      }
-    }
-    description = "Block common OWASP threats"
-  }
-  # An example of a security policy that prevents DDoS attacks
+  #rule {
+  #  action   = "deny(403)"
+  #  priority = 500
+  #  match {
+  #    expr {
+  #      expression = "evaluatePreconfiguredWaf(\"owasp-crs-v030001-high\")"
+  #    }
+  #  }
+  #  description = "Block common OWASP threats"
+  #}
+
+  # Security policy - prevent DDoS attacks
   adaptive_protection_config {
     layer_7_ddos_defense_config {
       enable = true
     }
   }
 
+  # Default allow rule for all other traffic
+  rule {
+    action   = "allow"
+    priority = "2147483647"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    description = "Default allow rule"
+  }
+
   depends_on = [
     google_project_iam_member.mlops_permissions,
     google_project_service.compute,
   ]
-}
-
-# Enable logging for Cloud Armor
-resource "null_resource" "enable_cloud_armor_logging" {
-  provisioner "local-exec" {
-    command = "gcloud compute security-policies update cloud-armor-policy --enable-logging"
-  }
-
-  # Only run this after the security policy is created
-  depends_on = [google_compute_security_policy.cloud_armor]
 }
 
 # -----------------------------------
@@ -1277,7 +1270,7 @@ resource "google_sql_database" "pg_database" {
 resource "google_sql_user" "pg_user" {
   name     = var.pgsql_user
   instance = google_sql_database_instance.pg_instance.name
-  password = var.pgsql_user # Store in Secret Manager instead
+  password = var.pgsql_password # Store in Secret Manager instead
 }
 
 # Create the SQL DB instance

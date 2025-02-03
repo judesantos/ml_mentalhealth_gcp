@@ -1,6 +1,7 @@
 # Local Terraform directories
 .terraform/
 .terraform.lock.hcl
+*.tfstate.lock.info
 
 # Terraform state files
 *.tfstate

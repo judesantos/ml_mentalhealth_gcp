@@ -8,8 +8,8 @@ from components.register import register_model
 from components.build import build_container
 from components.deploy import deploy_model
 
+
 @pipeline(
-    #pipeline_root="gs://your-bucket-name/kfp-pipelines"
     name="preprocess-train-register-build-deploy-pipeline",
     description="Pipeline to preprocess, train, evaluate, register, build container, and deploy model.",
 )
@@ -21,17 +21,21 @@ def mental_health_pipeline(
     container_image: str,
     endpoint_name: str,
 ):
+    # Step 1: Preprocess data
     preprocess_task = preprocess_data(input_data=input_data)
 
+    # Step 2: Train model
     train_task = train_model(
         preprocessed_data=preprocess_task.outputs["output_data"]
     )
 
+    # Step 3: Evaluate model
     evaluate_task = evaluate_model(
         preprocessed_data=preprocess_task.outputs["output_data"],
         model_path=train_task.outputs["model_path"]
     )
 
+    # Step 4: Register model
     register_task = register_model(
         model_path=train_task.outputs["model_path"],
         project_id=project_id,
@@ -39,6 +43,7 @@ def mental_health_pipeline(
         display_name="registered-model"
     )
 
+    # Step 5: Build container
     build_task = build_container(
         model_path=train_task.outputs["model_path"],
         project_id=project_id,
@@ -47,14 +52,16 @@ def mental_health_pipeline(
         container_image=container_image
     )
 
+    # Step 6: Deploy model
     deploy_task = deploy_model(
         project_id=project_id,
         region=region,
         container_image=f'{region}-docker.pkg.dev/{project_id}/'
-            f'{repo_name}/{container_image}:latest",'
-            f'endpoint_name={endpoint_name}',
+        f'{repo_name}/{container_image}:latest",'
+        f'endpoint_name={endpoint_name}',
         endpoint_name=endpoint_name
     )
+
 
 # Compile the pipeline using KFP v2 compiler.
 Compiler().compile(
