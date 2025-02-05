@@ -5,6 +5,16 @@ This project implements the ML Mental Health Modeling Pipeline on Google Cloud P
 
 ## Prerequisites
 
+For the developer:
+    Requires basic understanding of computer networks:
+        network security(Firewalls, common network vulnerability concepts and mitigation),
+        network infrastructures (load balancer, vpn, subnetworks, ipblocks, , IAM, etc..)
+        network/cloud storage, Db, cloud db
+    Some experience in cloud services (AWS, GCP, Azure, etc..):
+        Infrastructure setup, configuration,
+        kubernetes, docker: configuration, deployment
+    Terraform basics, configuration, troubleshooting.
+
 Before deploying this project, ensure the following:
 
 1. **Google Cloud Platform**:

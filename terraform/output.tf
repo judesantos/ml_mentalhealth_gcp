@@ -28,7 +28,7 @@ output "feature_store_name" {
   value       = google_vertex_ai_featurestore.mlops_feature_store.name
 }
 
-output "endpoint_name" {
+output "vertex_endpoint_name" {
   description = "The name of the Vertex AI endpoint."
   value       = google_vertex_ai_endpoint.endpoint.display_name
 }
@@ -43,10 +43,10 @@ output "alert_policy_name" {
   value       = google_monitoring_alert_policy.mlops_alert_policy.display_name
 }
 
-output "trigger_pipeline_function_url" {
-  description = "The HTTP trigger URL for the Cloud Function that triggers the Vertex AI pipeline."
-  value       = google_cloudfunctions_function.trigger_pipeline.https_trigger_url
-}
+#output "trigger_pipeline_function_url" {
+#  description = "The HTTP trigger URL for the Cloud Function that triggers the Vertex AI pipeline."
+#  value       = google_cloudfunctions_function.trigger_pipeline.https_trigger_url
+#}
 
 output "pipeline_url" {
   value       = "https://console.cloud.google.com/vertex-ai/pipelines?project=${var.project_id}"
