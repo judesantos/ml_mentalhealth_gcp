@@ -50,3 +50,5 @@ certs/*
 !certs/
 data/*
 !data/
+
+*/get_latest_tag.sh

@@ -1277,6 +1277,7 @@ resource "google_bigquery_dataset" "featurestore_dataset" {
   dataset_id  = "vertex_ai_featurestore"
   project     = var.project_id
   location    = var.region
+  depends_on = [google_project_service.bigquery]
 }
 
 resource "google_bigquery_table" "inference" {
@@ -1427,7 +1428,10 @@ resource "google_sql_user" "pg_user" {
   instance = google_sql_database_instance.pg_instance.name
   password = var.pgsql_password # Store in Secret Manager instead
 
-  depends_on = [ google_project_service.enabled_services ]
+  depends_on = [
+    google_sql_database.pg_database,
+    google_project_service.enabled_services
+  ]
 }
 
 # Create the SQL DB instance
