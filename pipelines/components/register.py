@@ -17,7 +17,7 @@ from google.cloud import aiplatform
     packages_to_install=["google-cloud-aiplatform"],
 )
 def register_model(
-    model_path: Input[Artifact],
+    container_image_uri: str,
     project_id: str,
     region: str,
     display_name: str,
@@ -40,7 +40,7 @@ def register_model(
     # Register the model in Vertex AI Model Registry
     model = aiplatform.Model.upload(
         display_name=display_name,
-        artifact_uri=model_path.path,
-        serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.0-24:latest",
+        artifact_uri=None,
+        serving_container_image_uri=container_image_uri,
     )
     return model.resource_name

@@ -8,7 +8,7 @@ from kfp.dsl import component
 def deploy_model(
     project_id: str,
     region: str,
-    container_image: str,
+    container_image_uri: str,
     endpoint_name: str,
 ):
     from google.cloud import aiplatform
@@ -17,8 +17,8 @@ def deploy_model(
 
     # Upload model
     model = aiplatform.Model.upload(
-        display_name="custom-prediction-model",
-        container_image_uri=container_image,
+        display_name="xgboost-middleware",
+        container_image_uri=container_image_uri,
     )
 
     # Create or get endpoint
