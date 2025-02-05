@@ -48,3 +48,5 @@ trigger_pipeline.zip
 
 certs/*
 !certs/
+data/*
+!data/
