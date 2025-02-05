@@ -1420,6 +1420,8 @@ resource "google_sql_database_instance" "pg_instance" {
 resource "google_sql_database" "pg_database" {
   name     = "pg-database"
   instance = google_sql_database_instance.pg_instance.name
+
+  depends_on = [ google_sql_user.pg_user ]
 }
 
 # Create PostgreSQL User (Secure via Secret Manager)
@@ -1428,15 +1430,14 @@ resource "google_sql_user" "pg_user" {
   instance = google_sql_database_instance.pg_instance.name
   password = var.pgsql_password # Store in Secret Manager instead
 
-  depends_on = [
-    google_sql_database.pg_database,
-    google_project_service.enabled_services
-  ]
+  depends_on = [google_project_service.enabled_services]
 }
 
 # Create the SQL DB instance
 data "google_sql_database_instance" "pg_instance" {
   name = google_sql_database_instance.pg_instance.name
+
+  depends_on = [ google_sql_user.pg_user ]
 }
 
 # Provide the database URL as a secret
