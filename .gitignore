@@ -52,3 +52,6 @@ data/*
 !data/
 
 */get_latest_tag.sh
+
+terraform/pipeline.yaml
+terraform/post

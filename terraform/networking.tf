@@ -206,8 +206,8 @@ resource "google_compute_security_policy" "cloud_armor" {
   }
 
   depends_on = [
-    google_project_iam_member.mlops_permissions,
     google_project_service.compute,
+    google_project_iam_member.mlops_permissions,
   ]
 }
 
@@ -219,7 +219,8 @@ resource "google_compute_security_policy" "cloud_armor" {
 resource "google_compute_url_map" "url_map" {
   name = "multi-backend-url-map"
 
-  default_service = google_compute_backend_service.mlops_app_backend.self_link
+  # Reply with a 404 error if no path is matched
+  default_service = google_compute_backend_service.error_backend.id
 
   host_rule {
     hosts        = ["*"] # Match all hosts, or specify a specific host like "example.com"
@@ -228,14 +229,34 @@ resource "google_compute_url_map" "url_map" {
 
   path_matcher {
     name            = "mlops-app"
-    default_service = google_compute_backend_service.mlops_app_backend.self_link
+    default_service = google_compute_backend_service.error_backend.id
 
     # Separate path rules for different services
     path_rule {
-      paths   = ["/*"]
-      service = google_compute_backend_service.mlops_app_backend.self_link
+      paths   = ["/app/*"]
+      service = google_compute_backend_service.mlops_app_backend.id
     }
-    # TODO: Add vertex AI endpoint path rules here
+    path_rule {
+      paths   = ["/vertexai/*"]
+      service = google_compute_backend_service.vertexai_backend.id
+    }
+  }
+
+  depends_on = [ google_project_service.compute ]
+}
+
+# 404 error backend service for unmatched paths
+resource "google_compute_backend_service" "error_backend" {
+  name                  = "error-backend"
+  load_balancing_scheme = "EXTERNAL"
+  protocol              = "HTTP"
+  health_checks         = [google_compute_health_check.error_check.id]
+}
+
+resource "google_compute_health_check" "error_check" {
+  name               = "error-health-check"
+  http_health_check {
+    port = 9999  # Fake port that doesn't respond
   }
 }
 
@@ -244,17 +265,12 @@ resource "google_compute_global_address" "default" {
   name         = "mlops-global-ip"
   address_type = "EXTERNAL"
   ip_version   = "IPV4"
-  depends_on   = [google_project_service.enabled_services]
-}
 
-# TODO: Looks like this is not used. Remove if not needed
-# Load balancer private IP address for internal traffic
-resource "google_compute_address" "load_balancer_ip" {
-  name         = "load-balancer-ip"
-  project      = var.project_id
-  region       = var.region
-  address_type = "INTERNAL"
-  subnetwork   = google_compute_subnetwork.public_subnet.name
+  lifecycle {
+    prevent_destroy = true  # Ensures Terraform will NEVER delete this IP
+  }
+
+  depends_on   = [google_project_service.enabled_services]
 }
 
 /*
@@ -270,7 +286,7 @@ resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
   private_key = file("../certs/app_private_key.pem")
   certificate = file("../certs/app_certificate.pem")
 
-  depends_on = [ google_project_service.compute ]
+  depends_on = [google_project_service.compute]
 }
 
 /*
@@ -302,3 +318,77 @@ resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
   ip_address = google_compute_global_address.default.address
 }
 
+
+# -----------------------------------
+# Kubernetes Endpoint Group
+# -----------------------------------
+
+locals {
+  # Parse the NEG annotations and use to establish the network endpoint group
+  # for the load balancer
+  neg_annotations = jsondecode(
+    lookup(
+      data.kubernetes_service.mlops_app_service.metadata[0].annotations != null ? data.kubernetes_service.mlops_app_service.metadata[0].annotations : {},
+      "cloud.google.com/neg-status",
+      "{}"
+    )
+  )
+}
+
+# Load balancer backend service for the compute network endpoint group
+data "google_compute_network_endpoint_group" "neg" {
+  for_each = can(jsondecode(lookup(data.kubernetes_service.mlops_app_service.metadata[0].annotations, "cloud.google.com/neg-status", "{}"))["network_endpoint_groups"]["8080"]) ? toset(data.google_compute_zones.available_zones.names) : []
+  name     = local.neg_annotations["network_endpoint_groups"]["8080"]
+  zone     = each.key
+  project  = var.project_id
+}
+
+# Kubernetes Backend Deployment specs
+resource "google_compute_backend_service" "mlops_app_backend" {
+  name                  = "service-a-backend"
+  description           = "Backend for kubernetes service"
+  protocol              = "HTTPS"
+  port_name             = "https"
+  load_balancing_scheme = "EXTERNAL"
+
+  dynamic "backend" {
+    for_each = data.google_compute_network_endpoint_group.neg
+    content {
+      group = backend.value.self_link
+    }
+  }
+
+  # Attach Cloud Armor
+  security_policy = google_compute_security_policy.cloud_armor.id
+}
+
+# -----------------------------------
+# Vertex AI enpoint group
+# -----------------------------------
+
+# Network endpoint group for Vertex AI - region and service specific only
+# TODO: Make more inclusive for other regions and services
+resource "google_compute_region_network_endpoint_group" "vertexai_neg" {
+  name                  = "vertexai-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+  cloud_function {
+    function = google_cloudfunctions_function.trigger_pipeline.name
+  }
+}
+
+resource "google_compute_backend_service" "vertexai_backend" {
+  name                            = "trigger-pipeline-backend"
+  description                     = "Backend for Vertex AI service"
+  protocol                        = "HTTPS"
+  load_balancing_scheme           = "EXTERNAL"
+  timeout_sec                     = 30
+  connection_draining_timeout_sec = 0
+
+  backend {
+    group = google_compute_region_network_endpoint_group.vertexai_neg.id
+  }
+
+  # Attach Cloud Armor
+  security_policy = google_compute_security_policy.cloud_armor.id
+}

@@ -39,6 +39,7 @@ resource "google_project_iam_member" "mlops_permissions" {
     "roles/secretmanager.secretAccessor",
     "roles/cloudsql.client",
     "roles/cloudsql.admin",
+    "roles/cloudfunctions.invoker"
   ])
   role = each.key
 
@@ -75,7 +76,7 @@ resource "google_secret_manager_secret_iam_member" "github_token_accessor" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:service-416879185829@gcp-sa-cloudbuild.iam.gserviceaccount.com"
 
-  depends_on = [ google_project_service.compute ]
+  depends_on = [google_project_service.compute]
 }
 
 /*
@@ -96,3 +97,18 @@ resource "google_secret_manager_secret_iam_member" "cloudbuild_secret_access" {
   member    = "serviceAccount:service-${var.project_number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
 }
 
+resource "google_project_iam_member" "cloudfunctions_service_account" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${var.project_id}@appspot.gserviceaccount.com"
+}
+
+# Public access to the cloud function trigger_pipeline
+resource "google_cloudfunctions_function_iam_member" "invoker" {
+  project        = google_cloudfunctions_function.trigger_pipeline.project
+  region         = google_cloudfunctions_function.trigger_pipeline.region
+  cloud_function = google_cloudfunctions_function.trigger_pipeline.name
+
+  role   = "roles/cloudfunctions.invoker"
+  member = "allUsers"
+}

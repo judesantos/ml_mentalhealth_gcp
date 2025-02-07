@@ -76,33 +76,6 @@ resource "google_cloudbuildv2_repository" "mlops_app_repo" {
   }
 }
 
-# Generate the script to fetch the latest git tag
-resource "local_file" "get_latest_tag_script" {
-  filename = "${path.module}/get_latest_tag.sh"
-  content  = <<-EOT
-    #!/bin/bash
-    # Fetch and sort tags by semantic version, then return the latest
-    LATEST_TAG=$(git ls-remote --tags --sort="v:refname" "https://github.com/$1/$2.git" \\
-      | awk -F/ '{print \$3}' \\
-      | grep -v '{}' \\
-      | tail -n1)
-    # Output as JSON (required for Terraform external data source)
-    echo "{\"result\":\"$LATEST_TAG\"}"
-  EOT
-  # Set executable permissions (Unix/Linux)
-  file_permission = "0755"
-}
-
-# Execute the script to get the latest tag
-data "external" "latest_tag" {
-  program    = ["bash", local_file.get_latest_tag_script.filename, var.github_user, var.github_repo]
-  depends_on = [local_file.get_latest_tag_script]
-}
-# Use the fetched tag reference
-locals {
-  tag_ref = data.external.latest_tag.result.result # e.g., "refs/tags/v0.1.1"
-}
-
 /*
   Listen to github for new tags, build and deploy the app with the new tag
 */

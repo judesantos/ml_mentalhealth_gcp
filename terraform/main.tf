@@ -6,18 +6,123 @@
 # -----------------------------------------------------
 
 /*
-  Vertex AI Pipeline setup Script.check.
+    Common variables
+*/
+
+resource "local_file" "pipeline_json" {
+  content  = <<EOT
+    {
+        "key": "value"
+    }
+    EOT
+  filename = "../pipelines/pipeline.json"
+}
+
+# Generate the script to fetch the latest git tag
+resource "local_file" "get_latest_tag_script" {
+  filename = "${path.module}/get_latest_tag.sh"
+  content  = <<-EOT
+        #!/bin/bash
+        # Fetch and sort tags by semantic version, then return the latest
+        LATEST_TAG=$(git ls-remote --tags --sort="v:refname" "https://github.com/$1/$2.git" \\
+        | awk -F/ '{print \$3}' \\
+        | grep -v '{}' \\
+        | tail -n1)
+        # Output as JSON (required for Terraform external data source)
+        echo "{\"result\":\"$LATEST_TAG\"}"
+    EOT
+  # Set executable permissions (Unix/Linux)
+  file_permission = "0755"
+}
+
+# Execute the script to get the latest tag
+data "external" "latest_tag" {
+  program    = ["bash", local_file.get_latest_tag_script.filename, var.github_user, var.github_repo]
+  depends_on = [local_file.get_latest_tag_script]
+}
+
+# Use the fetched tag reference
+locals {
+  tag_ref = data.external.latest_tag.result.result # e.g., "refs/tags/v0.1.1"
+
+  image_tag = replace(local.tag_ref, "refs/tags/", "")
+
+  bucket       = google_storage_bucket.mlops_gcs_bucket.name
+  project      = var.project_id
+  featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
+  entity_type  = google_vertex_ai_featurestore_entitytype.training_data.id
+
+  container_uri = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/${google_vertex_ai_endpoint.endpoint.name}:${local.image_tag}"
+  params        = "^#^project_id=${local.project},bucket_name=${local.bucket},featurestore_id=${local.featurestore},entity_type_id=${local.entity_type}"
+
+  spec = "gs://${local.bucket}/pipeline.json"
+
+  depends_on = [data.external.latest_tag]
+}
+
+/*
+  Vertex AI Pipeline setup Scripts.
   --------------------------------------
 
   Build pipeline.json
   Pipeline will include preprocessing (feature store integration), training,
   evaluation, model registration, and deployment steps
 */
+
 resource "null_resource" "generate_pipeline_json" {
   provisioner "local-exec" {
     command     = "python3 ../pipelines/pipeline.py"
     working_dir = "${path.module}/../pipelines/"
   }
+}
+
+resource "null_resource" "dataset_ingest" {
+  provisioner "local-exec" {
+    command     = "gsutil cp ../data/llcp_2022_2023_cleaned.csv gs://${local.bucket}/ml-mentalhealth/"
+    working_dir = "${path.module}/../data/"
+  }
+}
+
+/*
+  Trigger the Vertex AI Pipeline.
+  --------------------------------------
+
+  Run the pipeline using the generated pipeline.json file.
+  The pipeline will include preprocessing (feature store integration), training,
+  evaluation, model registration, and deployment steps.
+*/
+resource "null_resource" "trigger_pipeline" {
+  # Use the local-exec provisioner to send the HTTP request
+  provisioner "local-exec" {
+    command = <<EOT
+      curl -X POST ${google_cloudfunctions_function.trigger_pipeline.https_trigger_url} \
+        -H "Content-Type: application/json" \
+        -d '{
+              "parameters": {
+                "project": "${var.project_id}",
+                "region": "${var.region}",
+                "pipeline_name": "build_pipeline",
+                "pipeline-spec": "${local.spec}",
+                "project_id": "${var.project_id}",
+                "bucket_name": "${local.bucket}",
+                "featurestore_id": "${local.featurestore}",
+                "entity_type_id": "${local.entity_type}",
+                "container_image_uri": "${local.container_uri}",
+                "endpoint_name": "${google_vertex_ai_endpoint.endpoint.name}"
+              }
+            }'
+    EOT
+  }
+
+  # Depend on the Cloud Function being created,
+  # pipeline.json being uploaded to the GCS bucket, and
+  # the dataset being ingested and resides in the GCS bucket
+  depends_on = [
+    google_project_service.cloudfunctions,
+    google_cloudfunctions_function.trigger_pipeline,
+    null_resource.generate_pipeline_json,
+    null_resource.dataset_ingest,
+  ]
 }
 
 /*

@@ -50,6 +50,6 @@ resource "google_container_cluster" "mlops_gke_cluster" {
     ]
   }
 
-  depends_on = [ google_project_service.enabled_services["container.googleapis.com"] ]
+  depends_on = [google_project_service.enabled_services["container.googleapis.com"]]
 }
 

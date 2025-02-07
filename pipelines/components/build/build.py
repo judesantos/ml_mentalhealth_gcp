@@ -9,22 +9,18 @@ we need to preprocess inference data and add a list of required
 composite features. The middleware will handle these tasks.
 """
 
-import shutil
-
 from kfp.dsl import component, Input, Artifact
-from google.cloud.devtools.cloudbuild_v1.services.cloud_build import CloudBuildClient
-from google.cloud.devtools.cloudbuild_v1.types import Build
 
 
 @component(
-    base_image="python:3.12",
-    packages_to_install=["google-cloud-build"],
+    base_image='python:3.12',
+    packages_to_install=['google-cloud-build'],
 )
 def build_container(
     model: Input[Artifact],
     project_id: str,
     container_image_uri: str,
-):
+) -> bool:
     """
     Build a container image using Cloud Build.
 
@@ -36,46 +32,72 @@ def build_container(
     Args:
         - model_path: Artifact of the trained model
         - project_id: str, the project id
-        - region: str, the region
-        - repo_name: str, the repository name
-        - container_image: str, the container image name
+        - container_image_uri: str, the container image name
+
+    Returns:
+        - bool: True if the container image is successfully built, False otherwise
     """
 
-    # 1.Write a Dockerfile
+    import logging
 
-    # Make a temp copy of the model in the current directory
-    model_path = "model.xgb"
-    shutil.copy(model.path, model_path)
+    from google.cloud.devtools.cloudbuild_v1.services.cloud_build import CloudBuildClient
+    from google.cloud.devtools.cloudbuild_v1.types import Build
 
-    dockerfile = f'''
-    FROM python:3.12
-    WORKDIR /app
-    COPY {model_path} /app/{model_path}
-    COPY predictor.py /app/
-    RUN pip install flask pandas numpy scikit-learn joblib
-    EXPOSE 8080
-    CMD ["python", "predictor.py"]
-    '''
-    with open("Dockerfile", "w") as f:
-        f.write(dockerfile)
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-    # 2. Define a middleware image build using Cloud Build client
+    try:
+        # 1.Write a Dockerfile
 
-    build = Build(
-        steps=[
-            {  # Build the Docker image
-                "name": "gcr.io/cloud-builders/docker",
-                "args": ["build", "-t", container_image_uri, "."]
-            },
-            {  # Push the Docker image to Container Registry
-                "name": "gcr.io/cloud-builders/docker",
-                "args": ["push", container_image_uri]
-            }
-        ],
-        images=[container_image_uri],
-        tags=[container_image_uri],
-    )
+        MODEL_PATH = 'model.path'
+        logger.info(f'Copying the model to the current directory from {
+                    model.path}...')
 
-    # 3. Run the build
+        logger.info(f'Model copied to {path}')
+        logger.info('Writing the Dockerfile...')
 
-    CloudBuildClient().create_build(project_id=project_id, build=build)
+        dockerfile = f'''
+        FROM python:3.12
+        WORKDIR /app
+        COPY {model.path} /app/{MODEL_PATH}
+        COPY predictor.py /app/
+        COPY ml_inference_data.py /app/
+        RUN pip install flask pandas numpy scikit-learn xgboost
+        EXPOSE 8080
+        CMD ['python', 'predictor.py']
+        '''
+        with open('Dockerfile', 'w') as f:
+            f.write(dockerfile)
+
+        # 2. Define a middleware image build using Cloud Build client
+
+        logger.info('Building the container image...')
+
+        build = Build(
+            steps=[
+                {  # Build the Docker image
+                    'name': 'gcr.io/cloud-builders/docker',
+                    'args': ['build', '-t', container_image_uri, '.']
+                },
+                {  # Push the Docker image to Container Registry
+                    'name': 'gcr.io/cloud-builders/docker',
+                    'args': ['push', container_image_uri]
+                }
+            ],
+            images=[container_image_uri],
+            tags=[container_image_uri],
+        )
+
+        # 3. Run the build
+
+        logger.info('Running the build...')
+
+        CloudBuildClient().create_build(project_id=project_id, build=build)
+
+        logger.info('Container image built successfully!')
+
+    except Exception as e:
+        logger.error(f'Failed to build the container image: {e}')
+        return False
+
+    return True

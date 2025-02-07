@@ -33,10 +33,10 @@ output "vertex_endpoint_name" {
   value       = google_vertex_ai_endpoint.endpoint.display_name
 }
 
-output "load_balancer_ip" {
-  description = "The external IP address of the load balancer."
-  value       = google_compute_address.load_balancer_ip.address
-}
+#output "load_balancer_ip" {
+#  description = "The external IP address of the load balancer."
+#  value       = google_compute_address.load_balancer_ip.address
+#}
 
 output "alert_policy_name" {
   description = "The name of the alert policy for Vertex AI monitoring."

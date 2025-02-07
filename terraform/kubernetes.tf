@@ -71,42 +71,6 @@ data "kubernetes_service" "mlops_app_service" {
   depends_on = [kubernetes_service.mlops_app_service]
 }
 
-locals {
-  neg_annotations = jsondecode(
-    lookup(
-      data.kubernetes_service.mlops_app_service.metadata[0].annotations != null ? data.kubernetes_service.mlops_app_service.metadata[0].annotations : {},
-      "cloud.google.com/neg-status",
-      "{}"
-    )
-  )
-}
-
-data "google_compute_network_endpoint_group" "neg" {
-  for_each = can(jsondecode(lookup(data.kubernetes_service.mlops_app_service.metadata[0].annotations, "cloud.google.com/neg-status", "{}"))["network_endpoint_groups"]["8080"]) ? toset(data.google_compute_zones.available_zones.names) : []
-  name     = local.neg_annotations["network_endpoint_groups"]["8080"]
-  zone     = each.key
-  project  = var.project_id
-}
-
-# Kubernetes Backend Deployment specs
-resource "google_compute_backend_service" "mlops_app_backend" {
-  name                  = "service-a-backend"
-  description           = "Backend for kubernetes service"
-  protocol              = "HTTPS"
-  port_name             = "https"
-  load_balancing_scheme = "EXTERNAL"
-
-  dynamic "backend" {
-    for_each = data.google_compute_network_endpoint_group.neg
-    content {
-      group = backend.value.self_link
-    }
-  }
-
-  # Attach Cloud Armor
-  security_policy = google_compute_security_policy.cloud_armor.id
-}
-
 # Kubernetes Frontend Deployment specs
 resource "kubernetes_deployment" "mlops_app" {
   metadata {

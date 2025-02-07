@@ -20,7 +20,7 @@ resource "google_service_networking_connection" "private_vpc_connection" {
     ignore_changes = all
   }
 
-  depends_on = [ google_compute_global_address.private_ip_alloc ]
+  depends_on = [google_compute_global_address.private_ip_alloc]
 }
 
 # Create Cloud SQL PostgreSQL Instance
@@ -53,7 +53,7 @@ resource "google_sql_database" "pg_database" {
   name     = "pg-database"
   instance = google_sql_database_instance.pg_instance.name
 
-  depends_on = [ google_sql_user.pg_user ]
+  depends_on = [google_sql_user.pg_user]
 }
 
 # Create PostgreSQL User (Secure via Secret Manager)
@@ -69,7 +69,7 @@ resource "google_sql_user" "pg_user" {
 data "google_sql_database_instance" "pg_instance" {
   name = google_sql_database_instance.pg_instance.name
 
-  depends_on = [ google_sql_user.pg_user ]
+  depends_on = [google_sql_user.pg_user]
 }
 
 # Provide the database URL as a secret

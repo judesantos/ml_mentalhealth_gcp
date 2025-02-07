@@ -39,16 +39,7 @@ resource "google_compute_backend_bucket" "gcs_backend" {
   name        = "gcs-backend-bucket"
   bucket_name = google_storage_bucket.mlops_gcs_bucket.name
 
-  depends_on = [ google_project_service.compute ]
-}
-
-resource "local_file" "pipeline_json" {
-  content  = <<EOT
-  {
-    "key": "value"
-  }
-  EOT
-  filename = "../pipelines/pipeline.json"
+  depends_on = [google_project_service.compute]
 }
 
 # ------------------------------------
@@ -61,5 +52,4 @@ resource "google_storage_bucket_object" "pipeline_json" {
   source = local_file.pipeline_json.filename
 
   depends_on = [null_resource.generate_pipeline_json]
-
 }

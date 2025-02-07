@@ -37,7 +37,10 @@ Pipeline Steps:
     - Deploy the trained model to a Vertex AI endpoint for serving predictions.
 """
 
-from kfp.dsl import pipeline
+import logging
+
+import kfp.dsl as dsl
+from kfp.dsl import pipeline, component
 from kfp.compiler import Compiler
 
 from components.preprocess import preprocess_data
@@ -48,19 +51,26 @@ from components.build.build import build_container
 from components.deploy import deploy_model
 
 
+@component(base_image='python:3.12')
+def cleanup(message: str):
+    """
+    Cleanup the workspace after the pipeline execution.
+    """
+    print(message)
+
+
 @pipeline(
-    name="preprocess-train-register-build-deploy-pipeline",
+    name='preprocess-train-register-build-deploy-pipeline',
     description='''Pipeline to preprocess, train, evaluate, register,
-        build container, and deploy model.''',
+    build container, and deploy model.''',
 )
 def mental_health_pipeline(
-    bucket_name: str,
     project_id: str,
+    region: str,
+    bucket_name: str,
     featurestore_id: str,
     entity_type_id: str,
-    region: str,
-    repo_name: str,
-    container_image: str,
+    container_image_uri: str,
     endpoint_name: str,
 ):
     """
@@ -88,95 +98,97 @@ def mental_health_pipeline(
         endpoint_name (str): The Vertex AI endpoint name.
     """
 
-    # -------------------------------------
-    # Step 1: Preprocess data
-    # -------------------------------------
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-    preprocess_task = preprocess_data(
-        bucket_name=bucket_name,
-        region=region,
-        project_id=project_id,
-        featurestore_id=featurestore_id,
-        entity_type_id=entity_type_id
-    )
+    # Define the exit handler to cleanup the workspace
+    handle_exit = cleanup(message='Terminating pipeline, error occurred.')
 
-    success: bool = preprocess_task.outputs["output_data"]
-    if not success:
-        raise ValueError("Preprocessing failed.")
+    with dsl.ExitHandler(exit_task=handle_exit):
+        # Exit early if any one of the pipeline step fails
 
-    # -------------------------------------
-    # Step 2: Train model
-    # -------------------------------------
+        # -------------------------------------
+        # Step 1: Preprocess data
+        # -------------------------------------
 
-    train_task = train_model(
-        project_id=project_id,
-        region=region,
-        featurestore_id=featurestore_id,
-        entity_type_id=entity_type_id
-    )
+        preprocess_task = preprocess_data(
+            bucket_name=bucket_name,
+            region=region,
+            project_id=project_id,
+            featurestore_id=featurestore_id,
+            entity_type_id=entity_type_id
+        )
+        preprocess_task.set_caching_options(enable_caching=False)
 
-    if train_task == None:
-        raise ValueError("Training failed.")
+        # -------------------------------------
+        # Step 2: Train model
+        # -------------------------------------
 
-    xtest_data = train_task.outputs["xtest_output"]
-    ytest_data = train_task.outputs["ytest_output"]
-    model = train_task.outputs["model_output"]
+        train_task = train_model(
+            project_id=project_id,
+            region=region,
+            featurestore_id=featurestore_id,
+            entity_type_id=entity_type_id
+        ).after(preprocess_task)
+        train_task.set_caching_options(enable_caching=False)
 
-    # -------------------------------------
-    # Step 3: Evaluate model
-    # -------------------------------------
+        xtest_data = train_task.outputs['xtest_output']
+        ytest_data = train_task.outputs['ytest_output']
+        model = train_task.outputs['model_output']
 
-    evaluate_task = evaluate_model(
-        project_id=project_id,
-        region=region,
-        featurestore_id=featurestore_id,
-        entity_type_id=entity_type_id,
-        xtest_data=xtest_data,
-        ytest_data=ytest_data,
-        model=model
-    )
+        # -------------------------------------
+        # Step 3: Evaluate model
+        # -------------------------------------
 
-    container_image_uri = f'''{region}-docker.pkg.dev/
-    {project_id}/{repo_name}/{container_image}:latest'''
+        evaluate_task = evaluate_model(
+            xtest_data=xtest_data,
+            ytest_data=ytest_data,
+            model=model
+        ).after(train_task)
+        evaluate_task.set_caching_options(enable_caching=False)
 
-    # -------------------------------------
-    # Step 4: Build container
-    # -------------------------------------
+        # -------------------------------------
+        # Step 4: Build container
+        # -------------------------------------
 
-    build_task = build_container(
-        model=model,
-        project_id=project_id,
-        container_image_uri=container_image_uri
-    )
+        build_task = build_container(
+            model=model,
+            project_id=project_id,
+            container_image_uri=container_image_uri
+        ).after(evaluate_task)
+        build_task.set_caching_options(enable_caching=False)
 
-    # -------------------------------------
-    # Step 5: Register model
-    # -------------------------------------
+        # -------------------------------------
+        # Step 5: Register model
+        # -------------------------------------
 
-    # Instead of registering the model, we register the custome middleware
-    # to Vertex AI Model Registry
+        # Instead of registering the model, we register the custome middleware
+        # to Vertex AI Model Registry
 
-    register_task = register_model(
-        container_image_uri=container_image_uri,
-        project_id=project_id,
-        region=region,
-        display_name="xgboost-middleware"
-    )
+        register_task = register_model(
+            container_image_uri=container_image_uri,
+            project_id=project_id,
+            region=region,
+            display_name='xgboost-middleware'
+        ).after(build_task)
+        register_task.set_caching_options(enable_caching=False)
 
-    # -------------------------------------
-    # Step 6: Deploy model
-    # -------------------------------------
+        # -------------------------------------
+        # Step 6: Deploy model
+        # -------------------------------------
 
-    deploy_task = deploy_model(
-        project_id=project_id,
-        region=region,
-        container_image_uri=container_image_uri,
-        endpoint_name=endpoint_name
-    )
+        deploy_task = deploy_model(
+            project_id=project_id,
+            region=region,
+            container_image_uri=container_image_uri,
+            endpoint_name=endpoint_name
+        ).after(register_task)
+        deploy_task.set_caching_options(enable_caching=False)
 
 
-# Compile the pipeline using KFP v2 compiler.
+# Compile the pipeline
 Compiler().compile(
     pipeline_func=mental_health_pipeline,
-    package_path="pipeline.json",
+    package_path='pipeline.json',  # Use this for deploying the pipeline
+    # package_path='pipeline.yaml',  # Use this for local debugging    =False  # Disable caching the pipeline components
 )

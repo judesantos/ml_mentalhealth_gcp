@@ -5,23 +5,22 @@ Model Registry.
 Implement the `register_model` function using kfp.dsl.component
 implementation which abstracts away the virtual machine environment
 where the component runs.
-
 """
 
-from kfp.dsl import component, Input, Artifact
-from google.cloud import aiplatform
+from kfp.dsl import component, Input, Output
 
 
 @component(
-    base_image="python:3.12",
-    packages_to_install=["google-cloud-aiplatform"],
+    base_image='python:3.12',
+    packages_to_install=['google-cloud-aiplatform'],
 )
 def register_model(
     container_image_uri: str,
     project_id: str,
     region: str,
     display_name: str,
-) -> str:
+    resource_name: Output[str],
+) -> bool:
     """
     Register a trained model in Vertex AI Model Registry.
 
@@ -33,14 +32,34 @@ def register_model(
         - project_id: str, the project id
         - region: str, the region
         - display_name: str, the display name of the model
+
+    Returns:
+        - bool: True if the model is successfully registered, False otherwise
     """
 
-    aiplatform.init(project=project_id, location=region)
+    import logging
+    from google.cloud import aiplatform
 
-    # Register the model in Vertex AI Model Registry
-    model = aiplatform.Model.upload(
-        display_name=display_name,
-        artifact_uri=None,
-        serving_container_image_uri=container_image_uri,
-    )
-    return model.resource_name
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    try:
+        aiplatform.init(
+            project=project_id,
+            location=region,
+        )
+
+        # Register the model in Vertex AI Model Registry
+        model = aiplatform.Model.upload(
+            display_name=display_name,
+            artifact_uri=None,
+            serving_container_image_uri=container_image_uri,
+        )
+
+        resource_name = model.resource_name
+
+    except Exception as e:
+        logger.error(f'Failed to register the model: {e}')
+        return False
+
+    return True

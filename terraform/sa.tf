@@ -58,8 +58,16 @@ resource "google_project_service" "notebooks" {
 }
 
 resource "google_project_service" "cloudfunctions" {
+  for_each = toset([
+    "cloudfunctions.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "aiplatform.googleapis.com",
+    "run.googleapis.com",
+    "iam.googleapis.com"
+  ])
   project                    = var.project_id
-  service                    = "cloudfunctions.googleapis.com"
+  service = each.key
+
   disable_dependent_services = true
   disable_on_destroy         = true
 }

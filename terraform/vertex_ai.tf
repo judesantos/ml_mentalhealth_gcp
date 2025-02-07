@@ -39,7 +39,7 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
   source_archive_bucket = google_storage_bucket.mlops_gcs_bucket.name
   source_archive_object = google_storage_bucket_object.trigger_pipeline_zip.name
   trigger_http          = true
-  available_memory_mb   = 256
+  available_memory_mb   = 1024
   environment_variables = {
     PROJECT_ID = var.project_id
     REGION     = var.region
@@ -47,7 +47,7 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
     # python file.
     BUCKET_NAME = google_storage_bucket.mlops_gcs_bucket.name
   }
-  ingress_settings = "ALLOW_INTERNAL_AND_GCLB" # Restrict ingress settings
+  ingress_settings = "ALLOW_INTERNAL_AND_GCLB" # debug option: ALLOW_ALL
 
   # Executes uploading the dependencies for the Cloud Function
   depends_on = [
@@ -76,67 +76,67 @@ resource "google_vertex_ai_featurestore" "mlops_feature_store" {
 # Table schema for the data entity
 variable "mlops__data_features" {
   type = list(object({
-    name  = string
-    type  = string
+    name = string
+    type = string
     mode = string
   }))
   default = [
-    {"name": "poorhlth", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "physhlth", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "genhlth", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "diffwalk", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "diffalon", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "checkup1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "diffdres", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "addepev3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "acedeprs", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdlonely", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "lsatisfy", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "emtsuprt", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "decide", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cdsocia1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cddiscu1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cimemlo1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "smokday2", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "alcday4", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "marijan1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "exeroft1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "usenow3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "firearm5", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "income3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "educa", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "employ1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sex", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "marital", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "adult", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "rrclass3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "qstlang", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "_state", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "veteran3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "medcost1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhbills", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhemply", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhfood1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhstre1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhutils", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "sdhtrnsp", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cdhous1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "foodstmp", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "pregnant", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "asthnow", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "havarth4", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "chcscnc1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "chcocnc1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "diabete4", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "chccopd3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cholchk3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "bpmeds1", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "bphigh6", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cvdstrk3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cvdcrhd4", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "chckdny2", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "cholmed3", "type": "INTEGER", "mode": "REQUIRED"},
-    {"name": "_ment14d", "type": "INTEGER", "mode": "REQUIRED"}
+    { "name" : "poorhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "physhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "genhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "diffwalk", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "diffalon", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "checkup1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "diffdres", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "addepev3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "acedeprs", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdlonely", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "lsatisfy", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "emtsuprt", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "decide", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cdsocia1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cddiscu1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cimemlo1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "smokday2", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "alcday4", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "marijan1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "exeroft1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "usenow3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "firearm5", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "income3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "educa", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "employ1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sex", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "marital", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "adult", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "rrclass3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "qstlang", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "_state", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "veteran3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "medcost1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhbills", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhemply", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhfood1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhstre1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhutils", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "sdhtrnsp", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cdhous1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "foodstmp", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "pregnant", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "asthnow", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "havarth4", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "chcscnc1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "chcocnc1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "diabete4", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "chccopd3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cholchk3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "bpmeds1", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "bphigh6", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cvdstrk3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cvdcrhd4", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "chckdny2", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "cholmed3", "type" : "INTEGER", "mode" : "REQUIRED" },
+    { "name" : "_ment14d", "type" : "INTEGER", "mode" : "REQUIRED" }
   ]
 }
 
@@ -147,8 +147,8 @@ variable "mlops__data_features" {
 
 # 1. Training Data Entity using the Vertex AI Feature Store schema
 resource "google_vertex_ai_featurestore_entitytype" "training_data" {
-  name            = "training_data"
-  description     = "Entity for training data"
+  name        = "training_data"
+  description = "Entity for training data"
 
   featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
 
@@ -157,10 +157,10 @@ resource "google_vertex_ai_featurestore_entitytype" "training_data" {
 
 # Historical Features
 resource "google_vertex_ai_featurestore_entitytype_feature" "historical_features" {
-  for_each = { for feature in var.mlops__data_features : feature.name => feature }
-  entitytype   = google_vertex_ai_featurestore_entitytype.training_data.id
-  value_type   = each.value.type == "INTEGER" ? "INT64" : each.value.type
-  name         = each.value.name
+  for_each   = { for feature in var.mlops__data_features : feature.name => feature }
+  entitytype = google_vertex_ai_featurestore_entitytype.training_data.id
+  value_type = each.value.type == "INTEGER" ? "INT64" : each.value.type
+  name       = each.value.name
 
   depends_on = [
     google_container_cluster.mlops_gke_cluster,
@@ -187,23 +187,23 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "historical_features
 
 # Define the bigquery table for the feature store
 resource "google_bigquery_dataset" "featurestore_dataset" {
-  dataset_id  = "vertex_ai_featurestore"
-  project     = var.project_id
-  location    = var.region
+  dataset_id = "vertex_ai_featurestore"
+  project    = var.project_id
+  location   = var.region
   depends_on = [google_project_service.bigquery]
 }
 
 resource "google_bigquery_table" "inference" {
 
-  table_id   = "inference_data"
-  project    = var.project_id
+  table_id = "inference_data"
+  project  = var.project_id
 
   dataset_id = google_bigquery_dataset.featurestore_dataset.dataset_id
 
   schema = jsonencode(
     concat(
-      [{ "name": "id", "type": "INTEGER", "mode": "REQUIRED" }],
-      [for item in var.mlops__data_features : { "name": item.name, "type": item.type, "mode": item.mode }]
+      [{ "name" : "id", "type" : "INTEGER", "mode" : "REQUIRED" }],
+      [for item in var.mlops__data_features : { "name" : item.name, "type" : item.type, "mode" : item.mode }]
     )
   )
 
