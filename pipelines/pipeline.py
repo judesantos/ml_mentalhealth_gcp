@@ -59,12 +59,7 @@ def cleanup(message: str):
     print(message)
 
 
-@pipeline(
-    name='preprocess-train-register-build-deploy-pipeline',
-    description='''Pipeline to preprocess, train, evaluate, register,
-    build container, and deploy model.''',
-)
-def mental_health_pipeline(
+def run_mental_health_pipeline(
     project_id: str,
     region: str,
     bucket_name: str,
@@ -120,75 +115,110 @@ def mental_health_pipeline(
         )
         preprocess_task.set_caching_options(enable_caching=False)
 
-        # -------------------------------------
-        # Step 2: Train model
-        # -------------------------------------
+        with dsl.If(preprocess_task.outputs['Output'] == True, name='preprocess-success'):
 
-        train_task = train_model(
-            project_id=project_id,
-            region=region,
-            featurestore_id=featurestore_id,
-            entity_type_id=entity_type_id
-        ).after(preprocess_task)
-        train_task.set_caching_options(enable_caching=False)
+            # -------------------------------------
+            # Step 2: Train model
+            # -------------------------------------
 
-        xtest_data = train_task.outputs['xtest_output']
-        ytest_data = train_task.outputs['ytest_output']
-        model = train_task.outputs['model_output']
+            train_task = train_model(
+                project_id=project_id,
+                region=region,
+                featurestore_id=featurestore_id,
+                entity_type_id=entity_type_id
+            ).after(preprocess_task)
+            train_task.set_caching_options(enable_caching=False)
 
-        # -------------------------------------
-        # Step 3: Evaluate model
-        # -------------------------------------
+            with dsl.If(train_task.outputs['Output'] == True, name='train-success'):
 
-        evaluate_task = evaluate_model(
-            xtest_data=xtest_data,
-            ytest_data=ytest_data,
-            model=model
-        ).after(train_task)
-        evaluate_task.set_caching_options(enable_caching=False)
+                xtest_data = train_task.outputs['xtest_output']
+                ytest_data = train_task.outputs['ytest_output']
+                model = train_task.outputs['model_output']
 
-        # -------------------------------------
-        # Step 4: Build container
-        # -------------------------------------
+                # -------------------------------------
+                # Step 3: Evaluate model
+                # -------------------------------------
 
-        build_task = build_container(
-            model=model,
-            project_id=project_id,
-            container_image_uri=container_image_uri
-        ).after(evaluate_task)
-        build_task.set_caching_options(enable_caching=False)
+                evaluate_task = evaluate_model(
+                    xtest_data=xtest_data,
+                    ytest_data=ytest_data,
+                    model=model
+                ).after(train_task)
+                evaluate_task.set_caching_options(enable_caching=False)
 
-        # -------------------------------------
-        # Step 5: Register model
-        # -------------------------------------
+                if dsl.If(evaluate_task.outputs['Output'] == True, name='evaluate-success'):
 
-        # Instead of registering the model, we register the custome middleware
-        # to Vertex AI Model Registry
+                    # -------------------------------------
+                    # Step 4: Build container
+                    # -------------------------------------
 
-        register_task = register_model(
-            container_image_uri=container_image_uri,
-            project_id=project_id,
-            region=region,
-            display_name='xgboost-middleware'
-        ).after(build_task)
-        register_task.set_caching_options(enable_caching=False)
+                    build_task = build_container(
+                        model=model,
+                        project_id=project_id,
+                        container_image_uri=container_image_uri
+                    ).after(evaluate_task)
+                    build_task.set_caching_options(enable_caching=False)
 
-        # -------------------------------------
-        # Step 6: Deploy model
-        # -------------------------------------
+                    if dsl.If(build_task.outputs['Output'] == True, name='build-success'):
 
-        deploy_task = deploy_model(
-            project_id=project_id,
-            region=region,
-            container_image_uri=container_image_uri,
-            endpoint_name=endpoint_name
-        ).after(register_task)
-        deploy_task.set_caching_options(enable_caching=False)
+                        # -------------------------------------
+                        # Step 5: Register model
+                        # -------------------------------------
+
+                        # Instead of registering the model, we register the custome middleware
+                        # to Vertex AI Model Registry
+
+                        register_task = register_model(
+                            container_image_uri=container_image_uri,
+                            project_id=project_id,
+                            region=region,
+                            display_name='xgboost-middleware'
+                        ).after(build_task)
+                        register_task.set_caching_options(enable_caching=False)
+
+                        if dsl.If(register_task.outputs['Output'] == True, name='register-model-success'):
+
+                            # -------------------------------------
+                            # Step 6: Deploy model
+                            # -------------------------------------
+
+                            deploy_task = deploy_model(
+                                project_id=project_id,
+                                region=region,
+                                container_image_uri=container_image_uri,
+                                endpoint_name=endpoint_name
+                            ).after(register_task)
+                            deploy_task.set_caching_options(
+                                enable_caching=False)
+
+
+@pipeline(
+    name='preprocess-train-register-build-deploy-pipeline',
+    description='''Pipeline to preprocess, train, evaluate, register,
+    build container, and deploy model.''',
+)
+def mental_health_pipeline(
+    project_id: str,
+    region: str,
+    bucket_name: str,
+    featurestore_id: str,
+    entity_type_id: str,
+    container_image_uri: str,
+    endpoint_name: str,
+):
+    run_mental_health_pipeline(
+        project_id,
+        region,
+        bucket_name,
+        featurestore_id,
+        entity_type_id,
+        container_image_uri,
+        endpoint_name,
+    )
 
 
 # Compile the pipeline
 Compiler().compile(
     pipeline_func=mental_health_pipeline,
     package_path='pipeline.json',  # Use this for deploying the pipeline
-    # package_path='pipeline.yaml',  # Use this for local debugging    =False  # Disable caching the pipeline components
 )

@@ -4,8 +4,14 @@ from kfp.dsl import component, Output, Artifact
 @component(
     base_image='python:3.12',
     packages_to_install=[
-        'scikit-learn', 'xgboost', 'numpy',
-        'google-cloud-aiplatform', 'bayesian-optimization',
+        'scikit-learn',
+        'xgboost',
+        'pandas',
+        'numpy',
+        'bayesian-optimization',
+        'google-cloud-bigquery-storage',
+        'google-cloud-bigquery',
+        'db-dtypes',
     ],
 )
 def train_model(
@@ -33,9 +39,6 @@ def train_model(
         bool: True if the model is successfully trained, False otherwise
     """
 
-    # ####################################
-    #    Helper Functions
-    # ####################################
     """
     The module contains functions to train the model, tune the hyperparameters,
     test and save the model. Hyperparameter tuning is done using
@@ -50,15 +53,36 @@ def train_model(
     import logging
 
     import numpy as np
+    import pandas as pd
+
     import xgboost as xgb
     from sklearn.model_selection import train_test_split
     from bayes_opt import BayesianOptimization
     from sklearn.metrics import log_loss
     from sklearn.utils.class_weight import compute_class_weight
-    from google.cloud import aiplatform
+
+    from google.cloud import bigquery
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
+
+    TARGET = 'ment14d'
+    FEATURE_IDS = [
+        'poorhlth', 'physhlth', 'genhlth', 'diffwalk', 'diffalon',
+        'checkup1', 'diffdres', 'addepev3', 'acedeprs', 'sdlonely', 'lsatisfy',
+        'emtsuprt', 'decide', 'cdsocia1', 'cddiscu1', 'cimemlo1', 'smokday2',
+        'alcday4', 'marijan1', 'exeroft1', 'usenow3', 'firearm5', 'income3',
+        'educa', 'employ1', 'sex', 'marital', 'adult', 'rrclass3', 'qstlang',
+        'state', 'veteran3', 'medcost1', 'sdhbills', 'sdhemply', 'sdhfood1',
+        'sdhstre1', 'sdhutils', 'sdhtrnsp', 'cdhous1', 'foodstmp', 'pregnant',
+        'asthnow', 'havarth4', 'chcscnc1', 'chcocnc1', 'diabete4', 'chccopd3',
+        'cholchk3', 'bpmeds1', 'bphigh6', 'cvdstrk3', 'cvdcrhd4', 'chckdny2',
+        'cholmed3', 'ment14d'
+    ]
+
+    # ####################################
+    #    Helper Functions
+    # ####################################
 
     # Mapping class description of the actual target label.
     # _target_class_mapping = {1: '0 Days',
@@ -308,47 +332,54 @@ def train_model(
     # ####################################
 
     try:
-        # 1. Fetch the latest data from the training Feature Store
+        # 1. Fetching training data
 
-        # Initialize Vertex AI SDK
-        aiplatform.init(
-            project=project_id,
-            location=region,
-        )
+        logger.info('Initializing biqquery client...')
 
-        # Read all historical feature values from Feature Store
-        featurestore = aiplatform.Featurestore(featurestore_id)
-        feature_values = featurestore.batch_read_feature_values(
-            entity_type_id=entity_type_id
-        ).to_dataframe()
+        client = bigquery.Client(project=project_id, location=region)
+
+        query = f'''
+            SELECT {','.join(str(feat) for feat in FEATURE_IDS)}
+            FROM `{project_id}.{featurestore_id}.{entity_type_id}`
+        '''
+
+        logger.info('Reading records from the Feature Store...')
+
+        training_df = client.query(query).to_dataframe()
+
+        logger.info(
+            f'Feature Store records fetched successfully. count={training_df.shape[0]}')
 
         # 2. Prepare the datasets for training - save test for evaluation
 
-        # Let's prepare the datasets for training and save the rest for testing
+        logger.info('Preparing the datasets for training...')
 
-        target = '_ment14d'
-        features = feature_values.drop(columns=[target])
+        target = TARGET
+        X, y = training_df.drop(columns=[target]), training_df[target]
 
         # 3. Split into train (60%), eval(20%), and test(20%) sets
 
-        train_data, temp_data = train_test_split(
-            features, train_size=0.6, stratify=feature_values)
-        eval_data, test_data = train_test_split(
-            temp_data, test_size=0.5, stratify=temp_data[target])
+        X_train, x_temp, y_train, y_temp = train_test_split(
+            X,
+            y,
+            stratify=y,
+            test_size=0.4
+        )
 
-        # 4. Now we will train the model
-
-        # Separate the target from the features
-        X_train = train_data.drop(columns=[target])
-        y_train = train_data[target]
-        x_val = eval_data.drop(columns=[target])
-        y_val = eval_data[target]
-        x_test = test_data.drop(columns=[target])
-        y_test = test_data[target]
+        x_val, x_test, y_val, y_test = train_test_split(
+            x_temp,
+            y_temp,
+            stratify=y_temp,
+            test_size=0.5
+        )
 
         _y_train = target_label_mapping(y=y_train)
         _y_val = target_label_mapping(y=y_val)
         _y_test = target_label_mapping(y=y_test)
+
+        # 4. Now we will train the model
+
+        logger.info('Training the model...')
 
         # Train the model
         xgb_model, _x_test = train_model(
@@ -366,11 +397,13 @@ def train_model(
 
         # 4. Save the model and test sets for the evaluation component
 
+        logger.info('Saving the model and test sets...')
+
         xgb_model.save_model(model_output.path)
         _x_test.save_binary(xtest_output.path)
         np.save(ytest_output.path, _y_test)
 
-        logger.info(f'Model saved to {model_output.path}')
+        logger.info('Model training completed successfully.')
 
     except Exception as e:
         logger.error(f'An error occurred: {e}')
