@@ -46,7 +46,6 @@ resource "google_project_service" "compute" {
   disable_dependent_services = true
   disable_on_destroy         = true
 
-  depends_on = [google_project_service.serviceusage]
 }
 
 resource "google_project_service" "notebooks" {
@@ -65,7 +64,7 @@ resource "google_project_service" "cloudfunctions" {
     "run.googleapis.com",
     "iam.googleapis.com"
   ])
-  project                    = var.project_id
+  project = var.project_id
   service = each.key
 
   disable_dependent_services = true
@@ -124,7 +123,6 @@ resource "google_project_service" "enabled_services" {
   for_each = toset([
     "containerregistry.googleapis.com",
     "cloudbuild.googleapis.com",
-    "aiplatform.googleapis.com",
     "container.googleapis.com",
     "dataflow.googleapis.com",
     "artifactregistry.googleapis.com",

@@ -41,21 +41,31 @@ data "external" "latest_tag" {
   depends_on = [local_file.get_latest_tag_script]
 }
 
-# Use the fetched tag reference
-locals {
-  tag_ref = data.external.latest_tag.result.result # e.g., "refs/tags/v0.1.1"
+# Variable declarations
 
+locals {
+
+  project = var.project_id
+
+  # GCS bucket variables
+  bucket = google_storage_bucket.mlops_gcs_bucket.name
+
+  # Application docker image variables
+  tag_ref   = data.external.latest_tag.result.result # e.g., "refs/tags/v0.1.1"
   image_tag = replace(local.tag_ref, "refs/tags/", "")
 
-  bucket       = google_storage_bucket.mlops_gcs_bucket.name
-  project      = var.project_id
-  featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
-  entity_type  = google_vertex_ai_featurestore_entitytype.training_data.id
+  # Vertex AI variables
 
-  container_uri = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/${google_vertex_ai_endpoint.endpoint.name}:${local.image_tag}"
-  params        = "^#^project_id=${local.project},bucket_name=${local.bucket},featurestore_id=${local.featurestore},entity_type_id=${local.entity_type}"
-
-  spec = "gs://${local.bucket}/pipeline.json"
+  # Pipeline variables
+  data_file        = "llcp_2022_2023_cleaned.csv"
+  pipelines_bucket = "${local.bucket}/pipelines"
+  pipeline_json    = "pipelines/pipeline.json"
+  dataset_bucket   = "${local.pipelines_bucket}/data"
+  featurestore     = google_vertex_ai_featurestore.mlops_feature_store.name
+  entity_type      = google_vertex_ai_featurestore_entitytype.cdc_training.name
+  container_uri    = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/${google_vertex_ai_endpoint.endpoint.name}:${local.image_tag}"
+  #params           = "^#^project_id=${local.project},bucket_name=${local.bucket},featurestore_id=${local.featurestore},entity_type_id=${local.entity_type}"
+  #spec             = "gs://${local.pipelines_bucket}/pipeline.json"
 
   depends_on = [data.external.latest_tag]
 }
@@ -78,7 +88,7 @@ resource "null_resource" "generate_pipeline_json" {
 
 resource "null_resource" "dataset_ingest" {
   provisioner "local-exec" {
-    command     = "gsutil cp ../data/llcp_2022_2023_cleaned.csv gs://${local.bucket}/ml-mentalhealth/"
+    command     = "gsutil cp ${local.data_file} gs://${local.dataset_bucket}/${local.data_file}"
     working_dir = "${path.module}/../data/"
   }
 }
@@ -99,12 +109,9 @@ resource "null_resource" "trigger_pipeline" {
         -H "Content-Type: application/json" \
         -d '{
               "parameters": {
-                "project": "${var.project_id}",
-                "region": "${var.region}",
-                "pipeline_name": "build_pipeline",
-                "pipeline-spec": "${local.spec}",
                 "project_id": "${var.project_id}",
-                "bucket_name": "${local.bucket}",
+                "region": "${var.region}",
+                "bucket_name": "${local.pipelines_bucket}",
                 "featurestore_id": "${local.featurestore}",
                 "entity_type_id": "${local.entity_type}",
                 "container_image_uri": "${local.container_uri}",
@@ -118,6 +125,7 @@ resource "null_resource" "trigger_pipeline" {
   # pipeline.json being uploaded to the GCS bucket, and
   # the dataset being ingested and resides in the GCS bucket
   depends_on = [
+    google_cloudfunctions_function_iam_member.invoker,
     google_project_service.cloudfunctions,
     google_cloudfunctions_function.trigger_pipeline,
     null_resource.generate_pipeline_json,

@@ -45,14 +45,16 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
     REGION     = var.region
     # Set the bucket destination for the executable pipeline trigger
     # python file.
-    BUCKET_NAME = google_storage_bucket.mlops_gcs_bucket.name
+    #BUCKET_NAME = google_storage_bucket.mlops_gcs_bucket.name
+    BUCKET_NAME = local.pipelines_bucket
   }
-  ingress_settings = "ALLOW_INTERNAL_AND_GCLB" # debug option: ALLOW_ALL
+  #ingress_settings = "ALLOW_INTERNAL_AND_GCLB" # debug option: ALLOW_ALL
+  ingress_settings = "ALLOW_ALL"
 
   # Executes uploading the dependencies for the Cloud Function
   depends_on = [
     google_project_service.enabled_services["cloudbuild.googleapis.com"],
-    google_project_iam_member.artifact_registry_access,
+    google_project_iam_binding.artifact_registry_access,
     google_project_service.cloudfunctions,
     google_storage_bucket_object.trigger_pipeline_zip
   ]
@@ -62,82 +64,100 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
 # Vertex AI Feature Store
 # -----------------------------------
 
-resource "google_vertex_ai_featurestore" "mlops_feature_store" {
-  name   = "mlops_feature_store"
-  region = var.region
+# Table schema for the data entities
 
-  lifecycle {
-    ignore_changes = all
-  }
-
-  depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
-}
-
-# Table schema for the data entity
-variable "mlops__data_features" {
+variable "mlops_featurestore_features" {
   type = list(object({
     name = string
     type = string
     mode = string
   }))
   default = [
-    { "name" : "poorhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "physhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "genhlth", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "diffwalk", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "diffalon", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "checkup1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "diffdres", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "addepev3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "acedeprs", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdlonely", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "lsatisfy", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "emtsuprt", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "decide", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cdsocia1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cddiscu1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cimemlo1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "smokday2", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "alcday4", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "marijan1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "exeroft1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "usenow3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "firearm5", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "income3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "educa", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "employ1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sex", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "marital", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "adult", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "rrclass3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "qstlang", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "_state", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "veteran3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "medcost1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhbills", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhemply", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhfood1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhstre1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhutils", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "sdhtrnsp", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cdhous1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "foodstmp", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "pregnant", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "asthnow", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "havarth4", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "chcscnc1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "chcocnc1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "diabete4", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "chccopd3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cholchk3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "bpmeds1", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "bphigh6", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cvdstrk3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cvdcrhd4", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "chckdny2", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "cholmed3", "type" : "INTEGER", "mode" : "REQUIRED" },
-    { "name" : "_ment14d", "type" : "INTEGER", "mode" : "REQUIRED" }
+    { "name" : "id", "type" : "STRING", "mode" : "REQUIRED" },
+    { "name" : "ts", "type" : "STRING", "mode" : "REQUIRED" },
+    { "name" : "poorhlth", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "physhlth", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "genhlth", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "diffwalk", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "diffalon", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "checkup1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "diffdres", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "addepev3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "acedeprs", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdlonely", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "lsatisfy", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "emtsuprt", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "decide", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cdsocia1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cddiscu1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cimemlo1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "smokday2", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "alcday4", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "marijan1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "exeroft1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "usenow3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "firearm5", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "income3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "educa", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "employ1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sex", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "marital", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "adult", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "rrclass3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "qstlang", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "state", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "veteran3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "medcost1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhbills", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhemply", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhfood1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhstre1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhutils", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "sdhtrnsp", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cdhous1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "foodstmp", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "pregnant", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "asthnow", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "havarth4", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "chcscnc1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "chcocnc1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "diabete4", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "chccopd3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cholchk3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "bpmeds1", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "bphigh6", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cvdstrk3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cvdcrhd4", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "chckdny2", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "cholmed3", "type" : "INT64", "mode" : "REQUIRED" },
+    { "name" : "ment14d", "type" : "INT64", "mode" : "REQUIRED" }
   ]
+}
+
+# 1. Define the online feature store for the Vertex AI Feature Store
+#####################################################################
+
+resource "google_vertex_ai_feature_online_store" "mlops_online_store" {
+  name   = "mlops_online_store"
+  region = var.region
+
+  bigtable {
+    auto_scaling {
+      max_node_count = 1
+      min_node_count = 1
+    }
+  }
+
+}
+
+# 2. Define the feature store
+#####################################################################
+
+resource "google_vertex_ai_featurestore" "mlops_feature_store" {
+  name   = "mlops_feature_store"
+  region = var.region
+
+  depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
 }
 
 /*
@@ -145,9 +165,12 @@ variable "mlops__data_features" {
     One for training data, and one for inference data
 */
 
-# 1. Training Data Entity using the Vertex AI Feature Store schema
-resource "google_vertex_ai_featurestore_entitytype" "training_data" {
-  name        = "training_data"
+# 3. Define data Entities using the Vertex AI Feature Store schema
+#####################################################################
+
+# Training Data Entity
+resource "google_vertex_ai_featurestore_entitytype" "cdc_training" {
+  name        = "cdc_training"
   description = "Entity for training data"
 
   featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
@@ -155,62 +178,133 @@ resource "google_vertex_ai_featurestore_entitytype" "training_data" {
   depends_on = [google_vertex_ai_featurestore.mlops_feature_store]
 }
 
-# Historical Features
-resource "google_vertex_ai_featurestore_entitytype_feature" "historical_features" {
-  for_each   = { for feature in var.mlops__data_features : feature.name => feature }
-  entitytype = google_vertex_ai_featurestore_entitytype.training_data.id
-  value_type = each.value.type == "INTEGER" ? "INT64" : each.value.type
+# Training data entity cdc_training features
+resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_training_features" {
+  for_each   = { for feature in var.mlops_featurestore_features : feature.name => feature }
+  entitytype = google_vertex_ai_featurestore_entitytype.cdc_training.id
+  value_type = each.value.type
   name       = each.value.name
 
   depends_on = [
     google_container_cluster.mlops_gke_cluster,
-    google_vertex_ai_featurestore_entitytype.training_data
+    google_vertex_ai_featurestore_entitytype.cdc_training
   ]
 }
 
-# 2. Inference Data Entity - using the BigQuery table schema
+# Inference Data Entity
+resource "google_vertex_ai_featurestore_entitytype" "cdc_inference" {
+  name        = "cdc_inference"
+  description = "Entity for inferential data"
 
-/*
-  Define the feature store schema for the Mental Health inference dataset.
-  The schema is defined in the BigQuery table 'mental_health_features'.
+  featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
 
-  NOTE: We decided to use the BigQuery table as the source of truth for the
-    feature store schema because it is easier to manage for future
-      updates and ingestion.
-
-  The schema is used to create the feature store entity type.
-
-  Google cloud manages the linkage between the BigQuery table and the
-    feature store, so no need to link them manually - we just need to
-    provide the schema to the feature store client instance.
-*/
-
-# Define the bigquery table for the feature store
-resource "google_bigquery_dataset" "featurestore_dataset" {
-  dataset_id = "vertex_ai_featurestore"
-  project    = var.project_id
-  location   = var.region
-  depends_on = [google_project_service.bigquery]
+  depends_on = [google_vertex_ai_featurestore.mlops_feature_store]
 }
 
-resource "google_bigquery_table" "inference" {
+# Inference data entity cdc_inference Features
+resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_inference_features" {
+  for_each   = { for feature in var.mlops_featurestore_features : feature.name => feature }
+  entitytype = google_vertex_ai_featurestore_entitytype.cdc_inference.id
+  value_type = each.value.type
+  name       = each.value.name
 
-  table_id = "inference_data"
-  project  = var.project_id
-
-  dataset_id = google_bigquery_dataset.featurestore_dataset.dataset_id
-
-  schema = jsonencode(
-    concat(
-      [{ "name" : "id", "type" : "INTEGER", "mode" : "REQUIRED" }],
-      [for item in var.mlops__data_features : { "name" : item.name, "type" : item.type, "mode" : item.mode }]
-    )
-  )
-
-  deletion_protection = false
   depends_on = [
     google_container_cluster.mlops_gke_cluster,
-    google_bigquery_dataset.featurestore_dataset
+    google_vertex_ai_featurestore_entitytype.cdc_inference
+  ]
+}
+
+# 4. Setup the bigquery tables for the feature store
+#####################################################################
+
+# Create a BigQuery dataset
+resource "google_bigquery_dataset" "mlops_feature_store" {
+  dataset_id = "mlops_feature_store"
+  location   = var.region
+}
+
+# Create the BigQuery tables for the feature store
+
+# Training data table
+resource "google_bigquery_table" "cdc_training" {
+  table_id   = "cdc_training"
+  dataset_id = google_bigquery_dataset.mlops_feature_store.dataset_id
+
+  schema = jsonencode([
+    for feature in var.mlops_featurestore_features : {
+      name        = feature.name
+      type        = feature.type
+      mode        = feature.mode
+    }
+  ])
+
+  deletion_protection = false
+
+  depends_on = [google_bigquery_dataset.mlops_feature_store]
+}
+
+# Inference data table
+resource "google_bigquery_table" "cdc_inference" {
+  table_id   = "cdc_inference"
+  dataset_id = google_bigquery_dataset.mlops_feature_store.dataset_id
+
+  schema = jsonencode([
+    for feature in var.mlops_featurestore_features : {
+      name        = feature.name
+      type        = feature.type
+      mode        = feature.mode
+    }
+  ])
+
+  deletion_protection = false
+
+  depends_on = [google_bigquery_dataset.mlops_feature_store]
+}
+
+# 5. Define the feature views for the feature store
+#####################################################################
+
+# Feature view for training data
+resource "google_vertex_ai_feature_online_store_featureview" "cdc_training_featureview" {
+  name         = "cdc_training_featureview"
+  region = var.region
+
+  feature_online_store = google_vertex_ai_feature_online_store.mlops_online_store.name
+
+  big_query_source {
+    uri = "bq://${var.project_id}.${google_bigquery_dataset.mlops_feature_store.dataset_id}.${google_bigquery_table.cdc_training.table_id}"
+    entity_id_columns = [for entity_id in var.mlops_featurestore_features : entity_id.name]
+  }
+
+  sync_config {
+    cron = "0 * * * *"
+  }
+
+  depends_on = [
+    google_bigquery_table.cdc_training,
+    google_vertex_ai_feature_online_store.mlops_online_store
+  ]
+}
+
+# Feature view for inference data
+resource "google_vertex_ai_feature_online_store_featureview" "cdc_inference_featureview" {
+  name         = "cdc_inference_featureview"
+  region = var.region
+
+  feature_online_store = google_vertex_ai_feature_online_store.mlops_online_store.name
+
+  big_query_source {
+    uri = "bq://${var.project_id}.${google_bigquery_dataset.mlops_feature_store.dataset_id}.${google_bigquery_table.cdc_inference.table_id}"
+    entity_id_columns = [for entity_id in var.mlops_featurestore_features : entity_id.name]
+  }
+
+  sync_config {
+    cron = "0 * * * *"
+  }
+
+  depends_on = [
+    google_bigquery_table.cdc_inference,
+    google_vertex_ai_feature_online_store.mlops_online_store
   ]
 }
 

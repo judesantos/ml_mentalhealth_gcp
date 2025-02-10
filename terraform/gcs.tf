@@ -47,7 +47,7 @@ resource "google_compute_backend_bucket" "gcs_backend" {
 # ------------------------------------
 
 resource "google_storage_bucket_object" "pipeline_json" {
-  name   = "pipeline.json"
+  name   = "${local.pipeline_json}"
   bucket = google_storage_bucket.mlops_gcs_bucket.name
   source = local_file.pipeline_json.filename
 

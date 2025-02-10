@@ -242,7 +242,7 @@ resource "google_compute_url_map" "url_map" {
     }
   }
 
-  depends_on = [ google_project_service.compute ]
+  depends_on = [google_project_service.compute]
 }
 
 # 404 error backend service for unmatched paths
@@ -254,9 +254,9 @@ resource "google_compute_backend_service" "error_backend" {
 }
 
 resource "google_compute_health_check" "error_check" {
-  name               = "error-health-check"
+  name = "error-health-check"
   http_health_check {
-    port = 9999  # Fake port that doesn't respond
+    port = 9999 # Fake port that doesn't respond
   }
 }
 
@@ -266,11 +266,7 @@ resource "google_compute_global_address" "default" {
   address_type = "EXTERNAL"
   ip_version   = "IPV4"
 
-  lifecycle {
-    prevent_destroy = true  # Ensures Terraform will NEVER delete this IP
-  }
-
-  depends_on   = [google_project_service.enabled_services]
+  depends_on = [google_project_service.enabled_services]
 }
 
 /*

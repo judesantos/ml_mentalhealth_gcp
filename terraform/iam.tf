@@ -39,7 +39,10 @@ resource "google_project_iam_member" "mlops_permissions" {
     "roles/secretmanager.secretAccessor",
     "roles/cloudsql.client",
     "roles/cloudsql.admin",
-    "roles/cloudfunctions.invoker"
+    "roles/cloudfunctions.invoker",
+    "roles/bigquery.dataViewer",
+    "roles/bigquery.jobUser",
+    "roles/bigquery.dataEditor"
   ])
   role = each.key
 
@@ -52,7 +55,7 @@ resource "google_project_iam_member" "mlops_permissions" {
   Artifact Registry permissions for the MLOps service account
   Requires artifactregistry account memership
 */
-resource "google_project_iam_member" "artifact_registry_access" {
+resource "google_project_iam_binding" "artifact_registry_access" {
   project = var.project_id
 
   for_each = toset([
@@ -61,9 +64,10 @@ resource "google_project_iam_member" "artifact_registry_access" {
   ])
   role = each.key
 
-  member = "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com"
-
-  depends_on = [google_service_account.mlops_service_account]
+  members = [
+    "serviceAccount:${var.project_number}@cloudservices.gserviceaccount.com",
+    "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com"
+  ]
 }
 
 /*
