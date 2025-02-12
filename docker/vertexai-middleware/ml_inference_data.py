@@ -6,7 +6,7 @@ provde to the model.
 
 """
 
-TARGET = '_ment14d'
+TARGET = 'ment14d'
 
 
 class MentalHealthData():

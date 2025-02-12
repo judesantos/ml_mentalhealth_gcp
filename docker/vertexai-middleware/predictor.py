@@ -1,7 +1,7 @@
+import os
 import logging
 from typing import List, Dict
 
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 
@@ -16,8 +16,10 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load the trained model
-MODEL_PATH = '/app/model.path'
+# Load the trained model from the environment variable MODEL_URI which
+# was set in the Vertex AI registration step.
+MODEL_PATH = os.getenv('MODEL_URI')
+
 model = xgb.Booster()
 model.load_model(MODEL_PATH)
 

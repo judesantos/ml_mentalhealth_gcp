@@ -12,6 +12,7 @@ from kfp.dsl import component, Output, Artifact
         'google-cloud-bigquery-storage',
         'google-cloud-bigquery',
         'db-dtypes',
+        'joblib'
     ],
 )
 def train_model(
@@ -50,7 +51,9 @@ def train_model(
     evaluated using the test set.
     """
 
+    import os
     import logging
+    import joblib
 
     import numpy as np
     import pandas as pd
@@ -173,92 +176,89 @@ def train_model(
         dict: best hyperparameters
         """
 
-        try:
-            # Create the tuning model using DMatrix for XGBoost
-            _x_train = xgb.DMatrix(
-                X_train,
-                label=y_train,
-                enable_categorical=True,
-                weight=sample_weight
-            )
+        # Create the tuning model using DMatrix for XGBoost
+        _x_train = xgb.DMatrix(
+            X_train,
+            label=y_train,
+            enable_categorical=True,
+            weight=sample_weight
+        )
 
-            _x_test = xgb.DMatrix(
-                x_test,
-                label=y_test,
-                enable_categorical=True
-            )
+        _x_test = xgb.DMatrix(
+            x_test,
+            label=y_test,
+            enable_categorical=True
+        )
 
-            # Define Bayesian optimization callback function
-            # and train at each iteration
-            def xgb_eval(max_depth, learning_rate, num_boost_round, subsample,
-                         colsample_bytree, gamma, reg_alpha, reg_lambda):
-                params = {
-                    'eval_metric': 'mlogloss',
-                    'objective': 'multi:softprob',
-                    'num_class': 4,
-                    'max_depth': int(max_depth),
-                    'learning_rate': learning_rate,
-                    'subsample': subsample,
-                    'colsample_bytree': colsample_bytree,
-                    'gamma': gamma,
-                    'reg_alpha': reg_alpha,
-                    'reg_lambda': reg_lambda
-                }
-
-                # Train model with current hyperparameters
-                model = xgb.train(
-                    params,
-                    _x_train,
-                    num_boost_round=int(num_boost_round),
-                    # evals=[(_x_test, 'eval')],
-                    verbose_eval=False
-                )
-
-                # Predict probabilities
-                y_pred_probs = model.predict(_x_test)
-                # Compute log-loss
-                return -log_loss(y_test, y_pred_probs)
-
-            # Bounds for hyperparameters
-            # TODO - configurable hyperparameters
-            param_bounds = {
-                # n_estimators is num_boost_round for XGBoostClassifier
-                'num_boost_round': [100, 300],
-                'max_depth': [3, 10],
-                'learning_rate': [0.01, 0.1],
-                'subsample': [0.6, 1.0],
-                'colsample_bytree': [0.6, 1.0],
-                'gamma': [0, 5],
-                'reg_alpha': [0, 1],
-                'reg_lambda': [1, 5],
+        # Define Bayesian optimization callback function
+        # and train at each iteration
+        def xgb_eval(max_depth, learning_rate, num_boost_round, subsample,
+                     colsample_bytree, gamma, reg_alpha, reg_lambda):
+            params = {
+                'eval_metric': 'mlogloss',
+                'objective': 'multi:softprob',
+                'num_class': 4,
+                'max_depth': int(max_depth),
+                'learning_rate': learning_rate,
+                'subsample': subsample,
+                'colsample_bytree': colsample_bytree,
+                'gamma': gamma,
+                'reg_alpha': reg_alpha,
+                'reg_lambda': reg_lambda
             }
 
-            # Bayesian optimization
-            optimizer = BayesianOptimization(
-                f=xgb_eval,
-                pbounds=param_bounds,
-                verbose=False
+            # Train model with current hyperparameters
+            model = xgb.train(
+                params,
+                _x_train,
+                num_boost_round=int(num_boost_round),
+                # evals=[(_x_test, 'eval')],
+                verbose_eval=False
             )
-            # Run the optimization tasks then extract optimized results
-            optimizer.maximize(init_points=5, n_iter=25)
 
-            # Tuning is done, get the best parameters
+            # Predict probabilities
+            y_pred_probs = model.predict(_x_test)
+            # Compute log-loss
+            return -log_loss(y_test, y_pred_probs)
 
-            best_params = optimizer.max['params']
-            best_params['max_depth'] = int(best_params['max_depth'])
-            best_params['num_boost_round'] = int(
-                best_params['num_boost_round'])
-            best_params['learning_rate'] = float(best_params['learning_rate'])
-            best_params['subsample'] = float(best_params['subsample'])
-            best_params['colsample_bytree'] = float(
-                best_params['colsample_bytree'])
-            best_params['gamma'] = int(best_params['gamma'])
-            best_params['reg_alpha'] = float(best_params['reg_alpha'])
-            best_params['reg_lambda'] = int(best_params['reg_lambda'])
+        # Bounds for hyperparameters
+        # TODO - configurable hyperparameters
+        param_bounds = {
+            # n_estimators is num_boost_round for XGBoostClassifier
+            'num_boost_round': [100, 300],
+            'max_depth': [3, 10],
+            'learning_rate': [0.01, 0.1],
+            'subsample': [0.6, 1.0],
+            'colsample_bytree': [0.6, 1.0],
+            'gamma': [0, 5],
+            'reg_alpha': [0, 1],
+            'reg_lambda': [1, 5],
+        }
 
-            return best_params
-        except Exception as e:
-            return None
+        # Bayesian optimization
+        optimizer = BayesianOptimization(
+            f=xgb_eval,
+            pbounds=param_bounds,
+            verbose=False
+        )
+        # Run the optimization tasks then extract optimized results
+        optimizer.maximize(init_points=5, n_iter=25)
+
+        # Tuning is done, get the best parameters
+
+        best_params = optimizer.max['params']
+        best_params['max_depth'] = int(best_params['max_depth'])
+        best_params['num_boost_round'] = int(
+            best_params['num_boost_round'])
+        best_params['learning_rate'] = float(best_params['learning_rate'])
+        best_params['subsample'] = float(best_params['subsample'])
+        best_params['colsample_bytree'] = float(
+            best_params['colsample_bytree'])
+        best_params['gamma'] = int(best_params['gamma'])
+        best_params['reg_alpha'] = float(best_params['reg_alpha'])
+        best_params['reg_lambda'] = int(best_params['reg_lambda'])
+
+        return best_params
 
     def _create_and_train_model(
             X_train, y_train, x_test, y_test, h_params, sample_weight):
@@ -300,30 +300,27 @@ def train_model(
         }
         num_boost_round = h_params['num_boost_round']
 
-        try:
-            # Create the tuning model using DMatrix for XGBoost
-            _x_train = xgb.DMatrix(
-                X_train,
-                label=y_train,
-                enable_categorical=True,
-                weight=sample_weight
-            )
+        # Create the tuning model using DMatrix for XGBoost
+        _x_train = xgb.DMatrix(
+            X_train,
+            label=y_train,
+            enable_categorical=True,
+            weight=sample_weight
+        )
 
-            _x_test = xgb.DMatrix(
-                x_test,
-                label=y_test,
-                enable_categorical=True,
-            )
+        _x_test = xgb.DMatrix(
+            x_test,
+            label=y_test,
+            enable_categorical=True,
+        )
 
-            # Train model
-            model_xgb = xgb.train(
-                params,
-                _x_train,
-                # evals=[(_x_test, 'eval')],
-                num_boost_round=int(num_boost_round),
-            )
-        except Exception as e:
-            return None
+        # Train model
+        model_xgb = xgb.train(
+            params,
+            _x_train,
+            # evals=[(_x_test, 'eval')],
+            num_boost_round=int(num_boost_round),
+        )
 
         return model_xgb, _x_test
 
@@ -345,7 +342,9 @@ def train_model(
 
         logger.info('Reading records from the Feature Store...')
 
-        training_df = client.query(query).to_dataframe()
+        # TODO: Temporary - reduce the dataset size for testing
+        tmp_training_df = client.query(query).to_dataframe()
+        training_df = tmp_training_df.sample(frac=0.04)
 
         logger.info(
             f'Feature Store records fetched successfully. count={training_df.shape[0]}')
@@ -399,14 +398,26 @@ def train_model(
 
         logger.info('Saving the model and test sets...')
 
-        xgb_model.save_model(model_output.path)
-        _x_test.save_binary(xtest_output.path)
-        np.save(ytest_output.path, _y_test)
+        joblib.dump(xgb_model, model_output.path)
 
+        logger.info(f'Model saved to {model_output.path}')
+
+        _x_test.save_binary(xtest_output.path)
+
+        logger.info(f'Test features saved to {xtest_output.path}')
+
+        np.save(ytest_output.path, _y_test)
+        # np.save appends `.npy` to the file name which is not conformant
+        # with the output.path file naming format - Rename the file to
+        # remove the .npy extension
+        if os.path.exists(ytest_output.path + ".npy") and not os.path.exists(ytest_output.path):
+            os.rename(ytest_output.path + ".npy", ytest_output.path)
+
+        logger.info(f'Test target saved to {ytest_output.path}')
         logger.info('Model training completed successfully.')
 
     except Exception as e:
-        logger.error(f'An error occurred: {e}')
+        logger.error(f'Error training model: {str(e)}')
         return False
 
     return True

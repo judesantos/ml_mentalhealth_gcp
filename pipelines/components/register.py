@@ -7,7 +7,7 @@ implementation which abstracts away the virtual machine environment
 where the component runs.
 """
 
-from kfp.dsl import component, Input, Output
+from kfp.dsl import component, Input, Output, Artifact
 
 
 @component(
@@ -15,11 +15,12 @@ from kfp.dsl import component, Input, Output
     packages_to_install=['google-cloud-aiplatform'],
 )
 def register_model(
-    container_image_uri: str,
     project_id: str,
     region: str,
     display_name: str,
-    resource_name: Output[str],
+    container_image_uri: str,
+    model_artifact: Input[Artifact],
+    model_resource: Output[Artifact],
 ) -> bool:
     """
     Register a trained model in Vertex AI Model Registry.
@@ -32,34 +33,75 @@ def register_model(
         - project_id: str, the project id
         - region: str, the region
         - display_name: str, the display name of the model
+        - model_artifact_uri: Input[Artifact], the model artifact URI
+        - model: Output[Artifact], the registered model
 
     Returns:
         - bool: True if the model is successfully registered, False otherwise
     """
 
+    import os
     import logging
-    from google.cloud import aiplatform
+
+    from google.cloud import aiplatform, storage
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    try:
-        aiplatform.init(
-            project=project_id,
-            location=region,
-        )
+    # Define the destination path in GCS
+    bucket_name = 'mlops-gcs-bucket'
+    model_dst_path = 'models/xgb-model'
+    model_dst_filename = 'model.joblib'
 
-        # Register the model in Vertex AI Model Registry
-        model = aiplatform.Model.upload(
-            display_name=display_name,
-            artifact_uri=None,
-            serving_container_image_uri=container_image_uri,
-        )
+    # Define the source path of the model artifact
+    model_src_path = model_artifact.path
+    # Extract the filename from the model path
+    model_filename = os.path.basename(model_src_path)
 
-        resource_name = model.resource_name
+    # Define the GCS path of the destination model artifact
+    gcs_model_path = f'{model_dst_path}/{model_dst_filename}'
+    model_artifact_uri = f'gs://{bucket_name}/{model_dst_path}'
 
-    except Exception as e:
-        logger.error(f'Failed to register the model: {e}')
-        return False
+    # Initialize GCS client
+    client = storage.Client(project=project_id)
+    # Get the GCS bucket
+    bucket = client.bucket(bucket_name)
+
+    logger.info(f'Uploading model from model artifact {model_src_path}...')
+
+    # Upload the model directory to GCS
+    blob = bucket.blob(gcs_model_path)
+    blob.upload_from_filename(model_src_path)
+
+    logger.info(f'Uploaded model artifact to GCS: {model_artifact_uri}.')
+    logger.info(f'Registering model with display name: {display_name}...')
+
+    # Initialize Vertex AI client to register the model
+
+    aiplatform.init(
+        project=project_id,
+        location=region,
+    )
+
+    # Register the model in Vertex AI Model Registry
+    # The custom container is provided by the container registry URI
+    # The container auto loads the model using the model artifact URI
+    # provided through the MODEL_URI environment variable.
+
+    model = aiplatform.Model.upload(
+        project=project_id,
+        location=region,
+        display_name=display_name,
+        artifact_uri=model_artifact_uri,
+        serving_container_image_uri=container_image_uri,
+        serving_container_environment_variables={
+            'MODEL_URI': model_artifact_uri
+        }
+    )
+
+    model_resource.uri = model.resource_name
+
+    logger.info(
+        f'Model registered with Vertex AI: {model.resource_name}.')
 
     return True

@@ -1,4 +1,4 @@
-from kfp.dsl import component
+from kfp.dsl import component, Input, Artifact
 
 
 @component(
@@ -8,8 +8,7 @@ from kfp.dsl import component
 def deploy_model(
     project_id: str,
     region: str,
-    container_image_uri: str,
-    endpoint_name: str,
+    model_resource: Input[Artifact],
 ) -> bool:
     """
     Deploy the trained model to Vertex AI.
@@ -17,8 +16,7 @@ def deploy_model(
     Args:
         - project_id: str, the project id
         - region: str, the region
-        - container_image_uri: str, the container image URI
-        - endpoint_name: str, the endpoint name
+        - model_resource: Input[Artifact], the model resource
 
     Returns:
         - bool: True if the model is successfully deployed, False otherwise
@@ -30,34 +28,28 @@ def deploy_model(
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    try:
-        aiplatform.init(
-            project=project_id,
-            location=region,
-        )
+    logger.info(f'Deploying model to Vertex AI endpoint')
 
-        # Upload model
-        model = aiplatform.Model.upload(
-            display_name='xgboost-middleware',
-            container_image_uri=container_image_uri,
-        )
+    # Initialize the Vertex AI client
+    aiplatform.init(
+        project=project_id,
+        location=region,
+    )
 
-        # Create or get endpoint
-        endpoints = aiplatform.Endpoint.list(
-            filter=f'display_name={endpoint_name}')
-        if endpoints:
-            endpoint = endpoints[0]
-        else:
-            endpoint = aiplatform.Endpoint.create(display_name=endpoint_name)
+    logger.info(f'Loading model from {model_resource.uri}')
 
-        # Deploy the model
-        model.deploy(
-            endpoint=endpoint,
-            deployed_model_display_name='custom-prediction-deployment',
-            machine_type='n1-standard-4',
-        )
-    except Exception as e:
-        logger.error(f'Failed to deploy the model: {e}')
-        return False
+    # Load the model
+    model = aiplatform.Model(model_resource.uri)
+
+    logger.info(f'Deploying model to Vertex AI endpoint...')
+
+    # Deploy the model
+    endpoint = model.deploy(
+        machine_type='n1-standard-4',
+        min_replica_count=1,
+        max_replica_count=1,
+    )
+
+    logger.info(f'Model deployed to Vertex AI endpoint: {endpoint}.')
 
     return True

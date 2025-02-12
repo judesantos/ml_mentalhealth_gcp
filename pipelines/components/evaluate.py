@@ -3,7 +3,12 @@ from kfp.dsl import component, Input, Artifact
 
 @component(
     base_image='python:3.12',
-    packages_to_install=['scikit-learn', 'numpy', 'xgboost'],
+    packages_to_install=[
+        'scikit-learn',
+        'numpy',
+        'xgboost',
+        'joblib'
+    ],
 )
 def evaluate_model(
     xtest_data: Input[Artifact],
@@ -23,6 +28,7 @@ def evaluate_model(
     """
 
     import logging
+    import joblib
 
     import numpy as np
     import xgboost as xgb
@@ -52,11 +58,12 @@ def evaluate_model(
 
     # 1. Deserialize the model and test data
 
-    try:
-        logger.info(f'Loading the model from {model.path}...')
+    logger.info(f'Loading the model from {model.path}...')
 
-        xgb_model = xgb.Booster()
-        xgb_model.load_model(model.path)
+    try:
+        # xgb_model = xgb.Booster()
+        # xgb_model.load_model(model.path)
+        xgb_model = joblib.load(model.path)
 
         xtest = xgb.DMatrix(xtest_data.path)
         ytest = np.load(ytest_data.path)
@@ -67,14 +74,14 @@ def evaluate_model(
             xgb_model, xtest, ytest
         )
 
-        print(f'Final Log Loss: {final_log_loss}')
-        print(f'Accuracy: {accuracy}')
-        print(f'Precision: {precision}')
-        print(f'Recall: {recall}')
-        print(f'F1: {f1}')
+        logger.info(f'Final Log Loss: {final_log_loss}')
+        logger.info(f'Accuracy: {accuracy}')
+        logger.info(f'Precision: {precision}')
+        logger.info(f'Recall: {recall}')
+        logger.info(f'F1: {f1}')
 
     except Exception as e:
-        logger.error(f'Failed to evaluate the model: {e}')
+        logger.exception('Failed to evaluate the model.')
         return False
 
     return True

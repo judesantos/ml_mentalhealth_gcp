@@ -48,6 +48,7 @@ def preprocess_data(
     Returns:
         - bool: True if the data is successfully preprocessed, False otherwise
     """
+    return True
 
     import datetime
     import logging
@@ -71,8 +72,6 @@ def preprocess_data(
         'CHOLCHK3', 'BPMEDS1', 'BPHIGH6', 'CVDSTRK3', 'CVDCRHD4', 'CHCKDNY2',
         'CHOLMED3', '_MENT14D'
     ]
-
-    return True
 
     # ####################################
     #    Helper methods
@@ -142,9 +141,9 @@ def preprocess_data(
         # removing the prefix '_' in any column name
         df.columns = [col.lower().lstrip('_') for col in df.columns]
 
-        logger.info(f'Ingesting {df.shape[0]} rows into {entity_type_id}...')
-
         # Ingest the data into the featurestore
+
+        logger.info('Initializing biqquery client...')
 
         full_table_id = f'{project_id}.{featurestore_id}.{entity_type_id}'
 
@@ -152,8 +151,6 @@ def preprocess_data(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,  # Append to existing table
             autodetect=True,  # Auto-detect schema
         )
-
-        logger.info('Initializing biqquery client...')
 
         client = bigquery.Client(project=project_id, location=region)
 
@@ -168,7 +165,7 @@ def preprocess_data(
         logger.info(f'Ingested {job.output_rows} rows into {entity_type_id}.')
 
     except Exception as e:
-        logger.error(f'An error occurred: {str(e)}')
+        logger.error(f'Error in preprocessing data: {str(e)}')
         return False
 
     return True

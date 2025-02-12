@@ -1,7 +1,8 @@
+# -------------------------------------------------
+# Configurations for the MLOps Flask App
+# -------------------------------------------------
 
-# -----------------------------------
 # Secret Manager for GitHub Token
-# -----------------------------------
 
 resource "google_secret_manager_secret" "github_token" {
   secret_id = "github-token" # Name of the secret in Secret Manager
@@ -24,21 +25,6 @@ resource "google_secret_manager_secret_version" "github_token" {
 # Aside from creating a docker image for the app, the deployment also updates
 # the destination instance in a GKE cluster that serves the public domain.
 # --------------------------------------
-
-/*
-  We need a repository to store the Docker image
-  Note: GCR (Container Registry) is now called Artifact Registry
-*/
-resource "google_artifact_registry_repository" "mlops_repo" {
-  provider      = google
-  project       = var.project_id
-  location      = var.region
-  repository_id = "mlops-repo"
-  description   = "MLOps Docker Repository"
-  format        = "DOCKER"
-
-  depends_on = [google_project_service.enabled_services["artifactregistry.googleapis.com"]]
-}
 
 # Create a Gen2 connection to GitHub
 resource "google_cloudbuildv2_connection" "github_connection" {
