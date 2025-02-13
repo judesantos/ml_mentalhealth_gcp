@@ -53,17 +53,17 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 
 The **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** are designed for seamless integration and scalability. **Architecture diagrams** detailing the full pipeline are provided below:
 
-1. Platform Architecture:
+### 1. Platform Architecture:
 
-<img src="images/platform.png" alt="Description" width="400" height="300">
+   <img src="images/platform.png" alt="Description" width="600" height="500">
 
-2. Service Dataflow Diagram:
+### 2. Service Dataflow Diagram:
 
-<img src="images/dataflow.png" alt="Description" width="400" height="300">
+   <img src="images/dataflow.png" alt="Description" width="600" height="500">
 
-3. MLOps Architecture:
+### 3. MLOps Architecture:
 
-<img src="images/mlops.png" alt="Description" width="400" height="300">
+   <img src="images/mlops.png" alt="Description" width="600" height="500">
 
 
 ---
