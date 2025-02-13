@@ -1,23 +1,80 @@
 # ML Mental Health Modeling Pipeline on GCP Vertex AI Orchestrated with Terraform
 
-This project implements the ML Mental Health Modeling Pipeline on Google Cloud Platform (GCP), utilizing Vertex AI for model development and deployment, and Terraform for seamless infrastructure provisioning and management.
+This project implements the ML Mental Health Modeling Pipeline on Google Cloud Platform (GCP), using Vertex AI for model development and deployment, and Terraform for infrastructure provisioning and management.
+
+This project focuses on predicting mental health conditions using machine learning models deployed on Google Cloud's Vertex AI. Unlike the typical UI-driven approach, this project is fully automated using Terraform, allowing infrastructure to be provisioned and managed as code.
+
+---
+
+## Overview
+
+This project implements a scalable and adaptable machine learning (ML) pipeline designed for predictive modeling across various domains. By leveraging Google Cloud Platform (GCP), Vertex AI, and Terraform, the system automates model development, deployment, and continuous retraining, making it suitable for healthcare, finance, customer behavior analysis, and other data-driven applications.
+
+While the current implementation focuses on mental health prediction, the framework can be easily extended to other business models that require predictive analytics. The infrastructure and MLOps pipeline ensure seamless integration of new data sources, model updates, and cloud-based deployment, providing a flexible and reusable foundation for a variety of use cases.
+
+### Current Implementation: Mental Health Prediction
+Mental health issues are widespread and complex, yet timely and personalized support remains limited. Insufficient mental health care has led to legal, financial, and social consequences, with major healthcare providers facing lawsuits and penalties for failing to provide adequate behavioral health services.
+
+This implementation focuses on predicting mental health conditions using ML models trained on large-scale mental health survey data. The system provides insights for early intervention, helping healthcare providers, policymakers, and individuals proactively address mental health needs.
+
+#### Key Beneficiaries & Applications
+Healthcare & Mental Health Providers: Prioritize care, optimize resources, and improve patient outcomes.
+Businesses & HR Teams: Identify mental health risks among employees to enhance workplace well-being.
+Policy & Government Agencies: Use aggregated insights for public health planning and resource allocation.
+Research & Academia: Leverage the model framework for further analysis in mental health and beyond.
+
+#### Dataset & Data Pipeline
+
+The ML pipeline is built on a continuously evolving dataset framework that integrates new and diverse data sources over time.
+
+The current mental health model was trained using the CDC’s Behavioral Risk Factor Surveillance System (BRFSS), offering insights into mental health trends across the United States.
+Future iterations can incorporate additional sources, including real-time survey data, anonymized user responses, and external research datasets.
+The system is designed to automate dataset updates, ensuring the model adapts to new trends and remains relevant.
+
+### Data Science Approach
+
+#### **Feature Engineering**
+Key mental health indicators, lifestyle behaviors, and healthcare access patterns are extracted and transformed into meaningful features. This includes **categorizing complex responses**, combining related questions, and refining features for improved interpretability.
+
+#### **Predictive Modeling**
+Employs **classification algorithms** to predict mental health outcomes. The modeling pipeline begins with **logistic regression** as a baseline, followed by **neural networks, stacked models, and advanced classification techniques** to improve accuracy and robustness.
+
+#### **Application Development**
+A **web-based application** enables users to input predefined survey responses based on the model's most predictive features. The app provides **personalized insights** and **mental health recommendations**, ensuring **accessibility on both desktop and mobile platforms**.
+
+### MLOps & Deployment
+
+The deployment pipeline follows **MLOps best practices** to ensure:
+- **Scalability & Reliability**: Cloud-based deployment on **Google Cloud Platform (GCP)** using **Vertex AI**.
+- **Continuous Learning**: Automated monitoring, evaluation, and retraining of models to adapt to new data.
+- **Infrastructure as Code (IaC)**: Terraform is used to **provision and manage** all cloud resources dynamically.
+
+## Architecture
+
+The **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** are designed for seamless integration and scalability. **Architecture diagrams** detailing the full pipeline are provided below:
+
+---
 
 
 ## Prerequisites
 
-For the developer:
-    Requires basic understanding of computer networks:
-        network security(Firewalls, common network vulnerability concepts and mitigation),
-        network infrastructures (load balancer, vpn, subnetworks, ipblocks, , IAM, etc..)
-        network/cloud storage, Db, cloud db
-    Some experience in cloud services (AWS, GCP, Azure, etc..):
-        Infrastructure setup, configuration,
-        kubernetes, docker: configuration, deployment
-    Terraform basics, configuration, troubleshooting.
+### For the developer:
+
+Requires basic understanding of computer networks:
+    - network security(Firewalls, common network vulnerability concepts and mitigation),
+    - network infrastructures (load balancer, vpn, subnetworks, ipblocks, , IAM, etc..)
+    - network/cloud storage, Db, cloud db
+
+Some experience in cloud services (AWS, GCP, Azure, etc..):
+    - Infrastructure setup, configuration,
+    - kubernetes, docker: configuration, deployment
+
+Terraform basics, configuration, troubleshooting.
+
+### Developer Environment:
+**NOTE:** This project was developed on a **MacBook Pro M2** running macOS.
 
 Before deploying this project, ensure the following:
-
-**NOTE:** This project was developed on a **MacBook Pro M2** running macOS.
 
 1. **Google Cloud Platform**:
    - A GCP account with billing enabled.
@@ -86,7 +143,6 @@ Alternatively, you can pass variables during execution or use environment variab
 Initialize Terraform to download the required provider plugins and set up the backend:
 ```
     terraform init
-    terraform apply -var-file=terraform/pipeline.json.tfvars
 ```
 
 ### 4. Plan the Deployment
@@ -127,44 +183,61 @@ To remove the deployed infrastructure:
 
 ## Project Structure
 ```
-    ├── README.md
-    ├── cloud_functions
-    │   ├── retraining_notification
-    │   │   ├── main.py
-    │   │   └── requirements.txt
-    │   ├── trigger_pipeline
-    │   │   ├── main.py
-    │   │   └── requirements.txt
-    │   └── vertex_ai_notification
-    │       ├── main.py
-    │       └── requirements.txt
-    ├── environment.yml
-    ├── pipelines
-    │   ├── components
-    │   │   ├── build.py
-    │   │   ├── deploy.py
-    │   │   ├── evaluate.py
-    │   │   ├── preprocess.py
-    │   │   ├── register.py
-    │   │   └── train.py
-    │   └── pipeline.py
-    └── terraform
-        ├── graph.png
-        ├── main.tf
-        ├── output.tf
-        ├── terraform.tfvars
-        ├── variables.tf
-        └── versions.tf
+├── .env.development
+├── .gitignore
+├── README.md
+├── cloud_functions
+│   ├── retraining_notification
+│   │   ├── main.py
+│   │   └── requirements.txt
+│   ├── trigger_pipeline
+│   │   ├── main.py
+│   │   ├── requirements.txt
+│   │   └── trigger_pipeline.zip
+│   └── vertex_ai_notification
+│       ├── main.py
+│       └── requirements.txt
+├── data
+│   └── llcp_2022_2023_cleaned.csv
+├── docker
+│   └── vertexai-middleware
+│       ├── Dockerfile
+│       ├── build.sh
+│       ├── ml_inference_data.py
+│       └── predictor.py
+├── environment.yml
+├── pipelines
+│   ├── components
+│   │   ├── deploy.py
+│   │   ├── evaluate.py
+│   │   ├── preprocess.py
+│   │   ├── register.py
+│   │   └── train.py
+│   ├── pipeline.py
+│   ├── terraform.tfstate
+│   └── trigger_pipeline.py
+└── terraform
+    ├── app.tf
+    ├── database.tf
+    ├── gclb_cert.pem
+    ├── gcr.tf
+    ├── gcs.tf
+    ├── gke.tf
+    ├── iam.tf
+    ├── kubernetes.tf
+    ├── networking.tf
+    ├── output.tf
+    ├── provider.tf
+    ├── sa.tf
+    ├── setup.tf
+    ├── terraform.tfvars.development
+    ├── variables.tf
+    ├── versions.tf
+    └── vertex_ai.tf
 
 ```
 
 ## Notes
-
-###  Manually trigger the pipeline
-   To start the service for the first time, or to restart the pipeline if needed, use the following command:
-```
-    terraform apply -var-file=terraform/pipeline.json.tfvars
-```
 
 ## Troubleshooting
 If Terraform fails to authenticate, verify your GCP credentials:
@@ -178,11 +251,19 @@ Check logs for specific errors using:
     terraform show
 ```
 
-### Update mlops_app image
-Triggers the creation of a new image and pushes to the artifact registry.
+### Create, Update docker container images
+
+#### Mlops App:
+
+Triggers the creation of a new docker image and pushes to the artifact registry.
 Any changes in the terraform configuration will also be updated.
 ```
-terraform apply -replace=null_resource.mlops_app_docker_build
+terraform apply -replace="null_resource.mlops_app_docker_build"
+```
+
+### Vertex AI model enpoint custom container
+```
+terraform apply -replace="null_resource.vertexai_endpoint_middleware"
 ```
 
 
