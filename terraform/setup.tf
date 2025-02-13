@@ -168,10 +168,11 @@ resource "null_resource" "mlops_app_docker_build" {
       #!/bin/bash
       set -e
 
+      GIT_DEST=mlops_app
       cd ../docker
+      rm -rf $GIT_DEST
 
       # Set the image ID according to GCP artifact registry format
-      GIT_DEST=mlops_app
       GIT_REPO=${google_cloudbuildv2_repository.mlops_app_repo.remote_uri}
       IMAGE_ID=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}
 
@@ -210,6 +211,9 @@ resource "null_resource" "mlops_app_docker_build" {
 
       # Push the Docker image to GCR
       docker push $IMAGE_ID
+
+      # Clean up the cloned repository
+      rm -rf $GIT_DEST
 
     EOT
     interpreter = ["/bin/bash", "-c"]
