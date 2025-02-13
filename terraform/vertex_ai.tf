@@ -53,8 +53,8 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
   # Executes uploading the dependencies for the Cloud Function
   depends_on = [
     google_project_service.enabled_services["cloudbuild.googleapis.com"],
+    google_project_service.enabled_services["cloudfunctions.googleapis.com"],
     google_project_iam_binding.artifact_registry_access,
-    google_project_service.cloudfunctions,
     google_storage_bucket_object.trigger_pipeline_zip
   ]
 }

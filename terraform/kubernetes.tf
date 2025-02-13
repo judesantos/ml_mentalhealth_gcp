@@ -38,7 +38,7 @@ data "google_compute_zones" "available_zones" {
   project = var.project_id
   region  = data.google_container_cluster.mlops_gke_cluster.location
 
-  depends_on = [google_project_service.compute]
+  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
 }
 
 # Kubernetes Frontend Service

@@ -9,7 +9,7 @@ resource "google_compute_network" "mlops_vpc_network" {
   auto_create_subnetworks = false
 
   depends_on = [
-    google_project_service.compute
+    google_project_service.enabled_services["compute.googleapis.com"]
   ]
 }
 
@@ -206,7 +206,7 @@ resource "google_compute_security_policy" "cloud_armor" {
   }
 
   depends_on = [
-    google_project_service.compute,
+    google_project_service.enabled_services["compute.googleapis.com"],
     google_project_iam_member.mlops_permissions,
   ]
 }
@@ -242,7 +242,7 @@ resource "google_compute_url_map" "url_map" {
     }
   }
 
-  depends_on = [google_project_service.compute]
+  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
 }
 
 # 404 error backend service for unmatched paths
@@ -282,7 +282,7 @@ resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
   private_key = file("../certs/app_private_key.pem")
   certificate = file("../certs/app_certificate.pem")
 
-  depends_on = [google_project_service.compute]
+  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
 }
 
 /*

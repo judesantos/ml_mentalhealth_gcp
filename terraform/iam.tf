@@ -80,7 +80,7 @@ resource "google_secret_manager_secret_iam_member" "github_token_accessor" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:service-416879185829@gcp-sa-cloudbuild.iam.gserviceaccount.com"
 
-  depends_on = [google_project_service.compute]
+  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
 }
 
 /*

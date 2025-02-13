@@ -124,8 +124,8 @@ resource "null_resource" "trigger_pipeline" {
   # pipeline.json being uploaded to the GCS bucket, and
   # the dataset being ingested and resides in the GCS bucket
   depends_on = [
+    google_project_service.enabled_services["cloudfunctions.googleapis.com"],
     google_cloudfunctions_function_iam_member.invoker,
-    google_project_service.cloudfunctions,
     google_cloudfunctions_function.trigger_pipeline,
     null_resource.generate_pipeline_json,
     null_resource.dataset_ingest,
