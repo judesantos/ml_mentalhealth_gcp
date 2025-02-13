@@ -22,8 +22,6 @@ before being submitted to the model for prediction.
 """
 
 import os
-import joblib
-from functools import lru_cache
 
 import logging
 from typing import List, Dict
