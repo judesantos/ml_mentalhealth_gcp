@@ -17,6 +17,8 @@ For the developer:
 
 Before deploying this project, ensure the following:
 
+**NOTE:** This project was developed on a **MacBook Pro M2** running macOS.
+
 1. **Google Cloud Platform**:
    - A GCP account with billing enabled.
    - Required IAM roles for Terraform:
@@ -24,11 +26,15 @@ Before deploying this project, ensure the following:
      - `Storage Admin`, `Compute Admin`, `Vertex AI Admin` roles (depending on services used).
 
 2. **Local Environment**:
+   - Python => 3.12
+   - Miniconda
    - Install [Terraform](https://www.terraform.io/downloads.html).
    - Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install).
    - Authenticate to GCP using:
      ```
+        # Terraform GCP access
         gcloud auth application-default login
+        # gcloud cli commands
         gcloud auth login
      ```
 
@@ -46,15 +52,30 @@ Before deploying this project, ensure the following:
 
 Follow these steps to deploy the infrastructure:
 
-### 1. Clone the Repository
-Clone the repository containing this Terraform project:
+### 1. Clone the Repository, setup Python environment
+
+Clone the repository containing the Terraform project:
 ```
     git clone https://github.com/judesantos/ml_mentalhealth_gcp
     cd ml_mentalhealth_gcp
+
+```
+
+We need a Python environment with all the required packages to
+build Python artifacts that is then uploaded to GCP.
+
+Setup Python environment 'ml_gcp', run:
+```
+    # Creates a python environment named 'ml_gcp'
+    conda env create -f environment.yml
+    # Switch to 'ml_gcp'
+    conda activate ml_gcp
 ```
 
 ### 2. Set Up Terraform Variables
 Create a terraform.tfvars file to specify your variables (replace placeholders with actual values):
+NOTE: The cloned repo path in ./terraform should contain an example file 'terraform.tfvars.development'.
+      You may copy it and rename to terraform.tfvars, fill out values.
 ```
     project_id = "gcp-project-id"
     region     = "region"
