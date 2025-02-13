@@ -1,12 +1,23 @@
-FROM python:3.12
+FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /opt/app
 
-COPY predictor.py /app/
-COPY ml_inference_data.py /app/
+# Set environment variables to prevent Python from buffering stdout and stdin
+ENV PYTHONUNBUFFERED=1
 
-RUN pip install flask pandas numpy scikit-learn xgboost
+# Install the required system packages
+RUN apt-get update \
+    && apt-get install -y libpq-dev python3-dev gcc \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip
 
-EXPOSE 80
+# Copy the application files
+COPY predictor.py .
+COPY ml_inference_data.py .
 
-CMD ['python3', 'predictor.py']
+# Install the application required Python packages
+RUN pip install --no-cache-dir flask pandas numpy scikit-learn xgboost gunicorn
+
+EXPOSE 8080
+
+CMD ["gunicorn", "--log-level=debug", "--workers=4", "--threads=2", "--bind=0.0.0.0:8080", "predictor:app"]
