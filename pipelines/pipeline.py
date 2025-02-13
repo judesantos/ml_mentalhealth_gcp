@@ -153,8 +153,6 @@ def run_mental_health_pipeline(
             container_image_uri=container_image_uri,
         ).after(evaluate_task)
 
-        register_task.set_caching_options(False)
-
     run_success = register_task.outputs['Output']
 
     # -------------------------------------
@@ -170,8 +168,6 @@ def run_mental_health_pipeline(
             region=region,
             model_resource=model_resource
         ).after(register_task)
-
-        deploy_task.set_caching_options(False)
 
     run_success = deploy_task.output
 

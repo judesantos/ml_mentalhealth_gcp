@@ -115,7 +115,6 @@ resource "null_resource" "trigger_pipeline" {
                 "featurestore_id": "${local.featurestore}",
                 "entity_type_id": "${local.entity_type}",
                 "container_image_uri": "${local.container_uri}",
-                "endpoint_name": "${google_vertex_ai_endpoint.endpoint.name}"
               }
             }'
     EOT
@@ -177,7 +176,7 @@ resource "null_resource" "mlops_app_docker_build" {
       IMAGE_ID=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}
 
       # Clone the GitHub repository with the given tag
-      git clone --branch ${var.image_tag} --depth 1 $GIT_DEST
+      git clone $GIT_REPO --depth 1 $GIT_DEST
 
       cd $GIT_DEST
 
