@@ -5,6 +5,21 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 ---
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Technologies Used](#technologies-used)
+- [Data Processing](#data-processing)
+- [Model Development](#model-development)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [MLOps Practices](#mlops-practices)
+- [Getting Started](#getting-started)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ### Application
 
 <p align="center">
@@ -296,3 +311,17 @@ terraform destroy
   ```
 
 ---
+
+## Contributing
+Contributions are welcome! Please follow these steps:
+
+Fork the repository.
+Create a new branch (feature/your-feature).
+Commit your changes.
+Push to the branch.
+Open a Pull Request.
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+
