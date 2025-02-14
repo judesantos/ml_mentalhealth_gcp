@@ -1,3 +1,5 @@
-google-cloud-aiplatform
+google-cloud-aiplatform[pipelines]
 google-cloud-storage
+google-cloud-logging
 functions-framework
+pyyaml

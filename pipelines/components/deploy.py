@@ -1,37 +1,55 @@
-from kfp.dsl import component
+from kfp.dsl import component, Input, Artifact
 
 
 @component(
-    base_image="python:3.12",
-    packages_to_install=["google-cloud-aiplatform"],
+    base_image='python:3.12',
+    packages_to_install=['google-cloud-aiplatform'],
 )
 def deploy_model(
     project_id: str,
     region: str,
-    container_image: str,
-    endpoint_name: str,
-):
+    model_resource: Input[Artifact],
+) -> bool:
+    """
+    Deploy the trained model to Vertex AI.
+
+    Args:
+        - project_id: str, the project id
+        - region: str, the region
+        - model_resource: Input[Artifact], the model resource
+
+    Returns:
+        - bool: True if the model is successfully deployed, False otherwise
+    """
+
+    import logging
     from google.cloud import aiplatform
 
-    aiplatform.init(project=project_id, location=region)
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-    # Upload model
-    model = aiplatform.Model.upload(
-        display_name="custom-prediction-model",
-        container_image_uri=container_image,
+    logger.info(f'Deploying model to Vertex AI endpoint')
+
+    # Initialize the Vertex AI client
+    aiplatform.init(
+        project=project_id,
+        location=region,
     )
 
-    # Create or get endpoint
-    endpoints = aiplatform.Endpoint.list(
-        filter=f'display_name="{endpoint_name}"')
-    if endpoints:
-        endpoint = endpoints[0]
-    else:
-        endpoint = aiplatform.Endpoint.create(display_name=endpoint_name)
+    logger.info(f'Loading model from {model_resource.uri}')
+
+    # Load the model
+    model = aiplatform.Model(model_resource.uri)
+
+    logger.info(f'Deploying model to Vertex AI endpoint...')
 
     # Deploy the model
-    model.deploy(
-        endpoint=endpoint,
-        deployed_model_display_name="custom-prediction-deployment",
-        machine_type="n1-standard-4",
+    endpoint = model.deploy(
+        machine_type='n1-standard-4',
+        min_replica_count=1,
+        max_replica_count=1,
     )
+
+    logger.info(f'Model deployed to Vertex AI endpoint: {endpoint}.')
+
+    return True
