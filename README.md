@@ -176,6 +176,8 @@ region     = "region"
 ### 3. Initialize Terraform
 Initialize Terraform to download the required provider plugins and set up the backend:
 ```bash
+cd terraform
+
 terraform init
 ```
 
