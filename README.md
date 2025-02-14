@@ -5,10 +5,14 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 ---
 
-# Mental Health Application
+### Application
 
-![Platform Architecture](images/app1.png)
-![Platform Architecture](images/app2.png)
+<p align="center">
+  <img src="images/app1.png" width=600 />
+</p>
+<p align="center">
+  <img src="images/app2.png" width=600/>
+</p>
 
 ---
 
@@ -17,13 +21,20 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below are the architecture diagrams:
 
 ### 1. Platform Architecture
-![Platform Architecture](images/platform.png)
+
+<p align="center">
+  <img src="images/platform.png" width=600 "/>
+</p>
 
 ### 2. Service Dataflow Diagram
-![Service Dataflow](images/dataflow.png)
+<p align="center">
+  <img src="images/dataflow.png" width=600/>
+</p>
 
 ### 3. MLOps Architecture
-![MLOps Architecture](images/mlops.png)
+<p align="center">
+  <img src="images/mlops.png" width=600/>
+</p>
 
 ---
 
