@@ -5,6 +5,28 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 ---
 
+# Mental Health Application
+
+![Platform Architecture](images/app1.png)
+![Platform Architecture](images/app2.png)
+
+---
+
+## Architecture
+
+The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below are the architecture diagrams:
+
+### 1. Platform Architecture
+![Platform Architecture](images/platform.png)
+
+### 2. Service Dataflow Diagram
+![Service Dataflow](images/dataflow.png)
+
+### 3. MLOps Architecture
+![MLOps Architecture](images/mlops.png)
+
+---
+
 ## Overview
 
 This project provides a **scalable and adaptable ML pipeline** designed for predictive modeling across various domains. By integrating **GCP**, **Vertex AI**, and **Terraform**, the system automates model development, deployment, and continuous retraining. While the current implementation focuses on **mental health prediction**, the framework is extensible to other predictive analytics use cases, such as finance, customer behavior analysis, and more.
@@ -60,21 +82,6 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 - **Scalability & Reliability**: Cloud-based deployment on **Google Cloud Platform (GCP)** using **Vertex AI**.
 - **Continuous Learning**: Automated monitoring, evaluation, and retraining of models to adapt to new data.
 - **Infrastructure as Code (IaC)**: Terraform is used to **provision and manage** all cloud resources dynamically.
-
----
-
-## Architecture
-
-The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below are the architecture diagrams:
-
-### 1. Platform Architecture
-![Platform Architecture](images/platform.png)
-
-### 2. Service Dataflow Diagram
-![Service Dataflow](images/dataflow.png)
-
-### 3. MLOps Architecture
-![MLOps Architecture](images/mlops.png)
 
 ---
 
