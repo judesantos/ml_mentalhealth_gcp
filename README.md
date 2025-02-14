@@ -8,7 +8,7 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 ### Application
 
 <p align="center">
-  <img src="images/app1.png" width=600 />
+  <img src="images/app1.png" width=600 style="border-radius:5%;box-shadow:5px 5px 10px \#888;"/>
 </p>
 <p align="center">
   <img src="images/app2.png" width=600/>
