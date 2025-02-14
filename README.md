@@ -217,7 +217,7 @@ terraform destroy
 │       ├── build.sh                  # Build script for the Docker image
 │       ├── ml_inference_data.py      # Data preprocessing script
 │       └── predictor.py              # Router for the application implements /predict
-├── environment.yml
+├── environment.yml                   # Python environment packages required for this project
 ├── images
 │   ├── dataflow.png
 │   ├── mlops.png
