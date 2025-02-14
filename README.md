@@ -152,6 +152,7 @@ Create a `terraform.tfvars` file to specify your variables (replace placeholders
 ```bash
 project_id = "gcp-project-id"
 region     = "region"
+...
 ```
 
 ### 3. Initialize Terraform
