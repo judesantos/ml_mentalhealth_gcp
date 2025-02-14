@@ -206,7 +206,7 @@ terraform output -json > pipeline_report.json
 ```
 
 ### 8. Clean Up (Optional)
-To remove the deployed infrastructure:
+To tear down the deployed infrastructure:
 ```bash
 terraform destroy
 ```
