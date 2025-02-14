@@ -103,7 +103,7 @@ Before deploying, ensure the following:
 
 2. **Local Environment**:
    - Python => 3.12
-   - Docker (Docker Desktop of MacOs)
+   - Docker (Docker Desktop on MacOs)
    - Miniconda
    - Install [Terraform](https://www.terraform.io/downloads.html).
    - Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install).
