@@ -11,5 +11,9 @@ resource "google_artifact_registry_repository" "mlops_repo" {
   description   = "MLOps Docker Repository"
   format        = "DOCKER"
 
+  lifecycle {
+    prevent_destroy = false
+  }
+
   depends_on = [google_project_service.enabled_services["artifactregistry.googleapis.com"]]
 }

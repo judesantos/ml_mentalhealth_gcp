@@ -17,8 +17,10 @@ resource "google_service_networking_connection" "private_vpc_connection" {
   reserved_peering_ranges = [google_compute_global_address.private_ip_alloc.name]
 
   lifecycle {
-    ignore_changes = all
+    #ignore_changes = all
+    prevent_destroy = false
   }
+
 
   depends_on = [google_compute_global_address.private_ip_alloc]
 }

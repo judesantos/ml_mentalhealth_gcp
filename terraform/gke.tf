@@ -26,6 +26,8 @@ resource "google_container_cluster" "mlops_gke_cluster" {
       network,            # Ignore changes to the network block
       subnetwork,         # Ignore changes to the subnetwork block
     ]
+
+    prevent_destroy = false
   }
   ip_allocation_policy {
     cluster_secondary_range_name  = "pods-range"

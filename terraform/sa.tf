@@ -45,6 +45,14 @@ resource "kubernetes_service_account" "mlops_k8s_sa" {
 # Enable Required Services
 # -----------------------------------
 
+/*
+Admin permissions for the MLOps service account
+*/
+resource "google_project_service" "iam" {
+  service = "iam.googleapis.com"
+  project = var.project_id
+}
+
 resource "google_project_service" "enabled_services" {
   project                    = var.project_id
   disable_dependent_services = true
@@ -67,11 +75,11 @@ resource "google_project_service" "enabled_services" {
     "compute.googleapis.com",
     "cloudfunctions.googleapis.com",
     "run.googleapis.com",
-    "iam.googleapis.com",
     "servicenetworking.googleapis.com",
     "serviceusage.googleapis.com"
   ])
   service = each.key
 
+  depends_on = [  google_project_service.iam ]
 }
 

@@ -8,6 +8,8 @@ resource "google_compute_network" "mlops_vpc_network" {
   project                 = var.project_id
   auto_create_subnetworks = false
 
+
+
   depends_on = [
     google_project_service.enabled_services["compute.googleapis.com"]
   ]
