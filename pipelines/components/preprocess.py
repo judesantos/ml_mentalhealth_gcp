@@ -48,9 +48,7 @@ def preprocess_data(
     Returns:
         - bool: True if the data is successfully preprocessed, False otherwise
     """
-    return True
 
-    import datetime
     import logging
     from uuid_extensions import uuid7
 

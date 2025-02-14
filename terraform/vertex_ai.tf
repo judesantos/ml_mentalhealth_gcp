@@ -5,9 +5,10 @@
 /*
   An executable function is needed to trigger the Vertex AI pipeline.
   Here we use python trigger hosted in a Cloud Function.
+
   First we need to get this function trigger uploaded to a
-  Cloud Storage bucket so that the trigger 'trigger_pipeline' can reach
-  it and run the program.
+  Cloud Storage bucket for the trigger 'trigger_pipeline' to access
+  and execute the pipeline job.
 
   Steps:
   1. Zip the function source files from the project directory
@@ -44,7 +45,6 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
     REGION     = var.region
     # Set the bucket destination for the executable pipeline trigger
     # python file.
-    #BUCKET_NAME = google_storage_bucket.mlops_gcs_bucket.name
     BUCKET_NAME = local.pipelines_bucket
   }
   #ingress_settings = "ALLOW_INTERNAL_AND_GCLB" # debug option: ALLOW_ALL
@@ -59,9 +59,9 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
   ]
 }
 
-# -----------------------------------
-# Vertex AI Feature Store
-# -----------------------------------
+# ------------------------------------------------------
+# Vertex AI Feature Store - For online and batch serving
+# ------------------------------------------------------
 
 # Table schema for the data entities
 
@@ -134,7 +134,6 @@ variable "mlops_featurestore_features" {
 }
 
 # 1. Define the online feature store for the Vertex AI Feature Store
-#####################################################################
 
 resource "google_vertex_ai_feature_online_store" "mlops_online_store" {
   name   = "mlops_online_store"
@@ -150,7 +149,6 @@ resource "google_vertex_ai_feature_online_store" "mlops_online_store" {
 }
 
 # 2. Define the feature store
-#####################################################################
 
 resource "google_vertex_ai_featurestore" "mlops_feature_store" {
   name   = "mlops_feature_store"
@@ -165,7 +163,6 @@ resource "google_vertex_ai_featurestore" "mlops_feature_store" {
 */
 
 # 3. Define data Entities using the Vertex AI Feature Store schema
-#####################################################################
 
 # Training Data Entity
 resource "google_vertex_ai_featurestore_entitytype" "cdc_training" {
@@ -214,7 +211,6 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_inference_featu
 }
 
 # 4. Setup the bigquery tables for the feature store
-#####################################################################
 
 # Create a BigQuery dataset
 resource "google_bigquery_dataset" "mlops_feature_store" {
@@ -261,7 +257,6 @@ resource "google_bigquery_table" "cdc_inference" {
 }
 
 # 5. Define the feature views for the feature store
-#####################################################################
 
 # Feature view for training data
 resource "google_vertex_ai_feature_online_store_featureview" "cdc_training_featureview" {
@@ -307,9 +302,9 @@ resource "google_vertex_ai_feature_online_store_featureview" "cdc_inference_feat
   ]
 }
 
-# -----------------------------------
-# Vertex AI Endpoint
-# -----------------------------------
+# ------------------------------------------
+# Vertex AI Endpoint - for model deployment
+# ------------------------------------------
 
 resource "google_vertex_ai_endpoint" "endpoint" {
   name         = "mlops-endpoint"
@@ -317,7 +312,8 @@ resource "google_vertex_ai_endpoint" "endpoint" {
   location     = var.region
 
   lifecycle {
-    ignore_changes = all
+    #ignore_changes = all
+    prevent_destroy = false
   }
 
   depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
@@ -363,5 +359,4 @@ resource "google_monitoring_alert_policy" "mlops_alert_policy" {
     type        = "generic_alert"
   }
 }
-
 

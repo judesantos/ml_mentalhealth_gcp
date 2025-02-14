@@ -126,7 +126,6 @@ resource "kubernetes_deployment" "mlops_app" {
 
   depends_on = [
     google_sql_database.pg_database,
-    null_resource.mlops_app_docker_build,
     kubernetes_service_account.mlops_k8s_sa
   ]
 }

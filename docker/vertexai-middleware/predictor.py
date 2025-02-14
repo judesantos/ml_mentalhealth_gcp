@@ -1,5 +1,5 @@
 """
-This module defines the custom container for the Vertex AI model
+This module defines the custom container API endpoint for the Vertex AI model
 
 The container implements the model inference endpoint. It is a Flask app with
 a single POST endpoint /predict that accepts JSON data and returns the model
@@ -19,6 +19,8 @@ before being submitted to the model for prediction.
     - AIP_HTTP_PORT: The port on which the container listens
     - AIP_HEALTH_ROUTE: The health check endpoint
     - AIP_PREDICT_ROUTE: The prediction endpoint
+
+Runs on Gunicorn to manage concurrent requests
 """
 
 import os
