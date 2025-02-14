@@ -23,7 +23,7 @@ The system integrates **Mental Health Support Services**, **Cloud Platform**, an
 ### 1. Platform Architecture
 
 <p align="center">
-  <img src="images/platform.png" width=600 "/>
+  <img src="images/platform.png" width=600  style="border-radius:5%;box-shadow:5px 5px 10px \#888;"/>
 </p>
 
 ### 2. Service Dataflow Diagram
