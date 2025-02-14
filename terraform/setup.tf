@@ -64,8 +64,6 @@ locals {
   featurestore     = google_vertex_ai_featurestore.mlops_feature_store.name
   entity_type      = google_vertex_ai_featurestore_entitytype.cdc_training.name
   container_uri    = "${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/${google_vertex_ai_endpoint.endpoint.name}:${local.image_tag}"
-  #params           = "^#^project_id=${local.project},bucket_name=${local.bucket},featurestore_id=${local.featurestore},entity_type_id=${local.entity_type}"
-  #spec             = "gs://${local.pipelines_bucket}/pipeline.json"
 
   depends_on = [data.external.latest_tag]
 }
@@ -177,7 +175,7 @@ resource "null_resource" "mlops_app_docker_build" {
       IMAGE_ID=${var.region}-docker.pkg.dev/${var.project_id}/mlops-repo/mlops-app:${var.image_tag}
 
       # Clone the GitHub repository with the given tag
-      git clone $GIT_REPO --depth 1 $GIT_DEST
+      git clone --branch ${var.image_tag} $GIT_REPO --depth 1 $GIT_DEST
 
       cd $GIT_DEST
 
@@ -187,7 +185,7 @@ resource "null_resource" "mlops_app_docker_build" {
 
       # Copy the .env file from the local system to the cloned repository
       if [ -f "$ENV_FILE_PATH" ]; then
-        cp "$ENV_FILE_PATH" ./
+        cp "$ENV_FILE_PATH" .env
       else
         echo "Error: .env file not found at $ENV_FILE_PATH"
         exit 1
@@ -217,6 +215,8 @@ resource "null_resource" "mlops_app_docker_build" {
 
     EOT
     interpreter = ["/bin/bash", "-c"]
+
+
   }
 }
 
@@ -232,6 +232,7 @@ locals {
 
 # Custom container build for the Vertex AI model endpoint
 resource "null_resource" "vertexai_endpoint_middleware" {
+  depends_on = [ kubernetes_deployment.mlops_app ]
   provisioner "local-exec" {
     command     = <<EOT
       #!/bin/bash
@@ -254,4 +255,3 @@ resource "null_resource" "vertexai_endpoint_middleware" {
     interpreter = ["/bin/bash", "-c"]
   }
 }
-

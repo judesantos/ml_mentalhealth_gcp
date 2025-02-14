@@ -39,7 +39,8 @@ resource "google_cloudbuildv2_connection" "github_connection" {
   }
 
   lifecycle {
-    ignore_changes = all
+    #ignore_changes = all
+    prevent_destroy = false
   }
 
   depends_on = [
@@ -58,7 +59,8 @@ resource "google_cloudbuildv2_repository" "mlops_app_repo" {
   remote_uri        = "https://github.com/${var.github_user}/${var.github_repo}.git"
 
   lifecycle {
-    ignore_changes = all
+    #ignore_changes = all
+    prevent_destroy = false
   }
 }
 

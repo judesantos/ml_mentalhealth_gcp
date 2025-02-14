@@ -4,14 +4,6 @@
 # -----------------------------------
 
 /*
-Admin permissions for the MLOps service account
-*/
-resource "google_project_service" "iam" {
-  service = "iam.googleapis.com"
-  project = var.project_id
-}
-
-/*
 Member permissions for the MLOps service account
 */
 resource "google_project_iam_member" "mlops_permissions" {
@@ -65,8 +57,8 @@ resource "google_project_iam_binding" "artifact_registry_access" {
   role = each.key
 
   members = [
+    "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com",
     "serviceAccount:${var.project_number}@cloudservices.gserviceaccount.com",
-    "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com"
   ]
 }
 
