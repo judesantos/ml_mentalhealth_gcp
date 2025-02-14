@@ -1,6 +1,7 @@
 # Local Terraform directories
 .terraform/
 .terraform.lock.hcl
+*.tfstate.lock.info
 
 # Terraform state files
 *.tfstate
@@ -36,8 +37,22 @@ override.tf.json
 # Ignore log files
 *.log
 
+.env
+repo/
+
 __pycache__/
 pipeline.json
 trigger_pipeline.zip
 *.out
 *.backup
+
+certs/*
+!certs/
+data/*
+!data/
+
+*/get_latest_tag.sh
+
+terraform/pipeline.yaml
+terraform/post
+docker/mlops_app

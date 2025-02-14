@@ -1,0 +1,42 @@
+# The GCP project id
+project_id     = "ml-mentalhealth"
+
+# The GCP project comes with a project number.
+project_number = "<GCP_PROJECT_NUMBER>"
+
+# The GCP logged in user in 'gcloud auth application-default login'
+email          = "jude.msantos@gmail.com"
+
+# The GCP project region
+region         = "us-central1"
+
+# The authorized github user to the application:
+# mentalhealth app (https://github.com/judesantos/ml_mentalhealth_app)
+github_user    = "github_username"
+github_repo    = "ml-mentalhealth_app"
+
+# The Google Cloud Build application id configured in the github user account.
+github_app_id  = "THE_GITHUB_APP_ID_FOR_GOOGLE_CLOUD_BUILD"
+
+# Generate a github PAT from an authorized github user account
+github_token   = "THE_GITHUB_ACCOUNT_PERSONAL_ACCESS_TOKEN"
+
+# For manual deployment of mentalhealth app version tag,
+# use the git tag found in the application's repo tags.
+image_tag      = "<THE_GITHUB_VERSION_TAG_NAME>"
+
+# The mentalhealth app requires a .env file with the
+# configuration values required for the proper deployment in the cloud
+# environment. Create this file and set its relative path here.
+# NOTE: A sample file .env.development is provided in the root path of the repo,
+#       Copy, rename and fill out the required variables.
+env_file       = "../.env"
+
+# Ml mentalhealth app
+# Requires the ssl certificate, and private key files.
+# Set the relative path to the files here.
+cert           = "../certs"
+
+# Create PgSql Db - required admin user/pass
+pgsql_user     = ""
+pgsql_password = ""
