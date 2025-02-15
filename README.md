@@ -5,13 +5,15 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 Below is an overview of the infrastructure and model training pipeline.
 
+Application:
+
 <p align="center">
-  <h3>Application</h3>
   <img src="images/app.png" width=600 />
 </p>
 
+Architecure:
+
 <p align="center">
-  <h3>Architecure</h3>
   <img src="images/architecture.png" width=600 "/>
 </p>
 
