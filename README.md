@@ -1,5 +1,5 @@
 
-# ML Mental Health Modeling Pipeline on GCP Vertex AI Orchestrated with Terraform
+# ML Mental Health Modeling Pipeline on GCP Vertex AI, Orchestrated with Terraform
 
 This project implements a **Machine Learning (ML) Mental Health Modeling Pipeline** on **Google Cloud Platform (GCP)**, leveraging **Vertex AI** for model development and deployment, and **Terraform** for infrastructure provisioning and management. The pipeline is fully automated, enabling infrastructure-as-code (IaC) practices for scalability and reproducibility.
 
