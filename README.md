@@ -24,7 +24,9 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 ## Overview
 
-This project automates end-to-end machine learning workflows using GCP, Vertex AI, and Terraform. It is designed to predict mental health conditions and can be extended to other domains like finance and customer analytics.
+This project automates end-to-end machine learning workflows using GCP, Vertex AI, and Terraform.
+
+The project is designed to predict mental health conditions and can be extended to other domains like finance and customer analytics.
 
 Below is an overview of the infrastructure and model training pipeline.
 
