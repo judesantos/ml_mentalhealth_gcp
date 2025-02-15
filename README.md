@@ -3,20 +3,6 @@
 
 This project implements a **Machine Learning (ML) Mental Health Modeling Pipeline** on **Google Cloud Platform (GCP)**, leveraging **Vertex AI** for model development and deployment, and **Terraform** for infrastructure provisioning and management. The pipeline is fully automated, enabling infrastructure-as-code (IaC) practices for scalability and reproducibility.
 
-Below is an overview of the infrastructure and model training pipeline.
-
-Application:
-
-<p align="center">
-  <img src="images/app.png" width=600 />
-</p>
-
-Architecure:
-
-<p align="center">
-  <img src="images/architecture.png" width=600 "/>
-</p>
-
 ---
 
 ## Table of Contents
@@ -39,6 +25,20 @@ Architecure:
 ## Overview
 
 This project automates end-to-end machine learning workflows using GCP, Vertex AI, and Terraform. It is designed to predict mental health conditions and can be extended to other domains like finance and customer analytics.
+
+Below is an overview of the infrastructure and model training pipeline.
+
+Application:
+
+<p align="center">
+  <img src="images/app.png" width=600 />
+</p>
+
+Architecure:
+
+<p align="center">
+  <img src="images/architecture.png" width=600 "/>
+</p>
 
 ### Key Features:
 - **Automated Infrastructure**: Terraform manages cloud resources dynamically.
