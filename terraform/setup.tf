@@ -16,6 +16,10 @@ resource "local_file" "pipeline_json" {
     }
     EOT
   filename = "../pipelines/pipeline.json"
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 # Generate the script to fetch the latest git tag
@@ -33,6 +37,10 @@ resource "local_file" "get_latest_tag_script" {
     EOT
   # Set executable permissions (Unix/Linux)
   file_permission = "0755"
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 # Execute the script to get the latest tag
@@ -82,6 +90,12 @@ resource "null_resource" "generate_pipeline_json" {
     command     = "python3 ../pipelines/pipeline.py"
     working_dir = "${path.module}/../pipelines/"
   }
+
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  depends_on = [ google_storage_bucket.mlops_gcs_bucket ]
 }
 
 resource "null_resource" "dataset_ingest" {
@@ -89,6 +103,12 @@ resource "null_resource" "dataset_ingest" {
     command     = "gsutil cp ${local.data_file} gs://${local.dataset_bucket}/${local.data_file}"
     working_dir = "${path.module}/../data/"
   }
+
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  depends_on = [ google_storage_bucket.mlops_gcs_bucket ]
 }
 
 /*
@@ -118,12 +138,16 @@ resource "null_resource" "trigger_pipeline" {
     EOT
   }
 
+  lifecycle {
+    prevent_destroy = false
+  }
+
   # Depend on the Cloud Function being created,
   # pipeline.json being uploaded to the GCS bucket, and
   # the dataset being ingested and resides in the GCS bucket
   depends_on = [
-    google_project_service.enabled_services["cloudfunctions.googleapis.com"],
     google_cloudfunctions_function_iam_member.invoker,
+    google_project_service.cloudfunctions,
     google_cloudfunctions_function.trigger_pipeline,
     null_resource.generate_pipeline_json,
     null_resource.dataset_ingest,
@@ -145,6 +169,10 @@ resource "null_resource" "docker_auth" {
   provisioner "local-exec" {
     command = "echo '${base64decode(google_service_account_key.docker_auth_key.private_key)}' | docker login -u _json_key --password-stdin https://gcr.io"
   }
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 # ----------------------------------------------------------------------
@@ -161,6 +189,8 @@ resource "null_resource" "docker_auth" {
 # ----------------------------------------------------------------------
 
 resource "null_resource" "mlops_app_docker_build" {
+  depends_on = [ google_artifact_registry_repository.mlops_repo ]
+
   provisioner "local-exec" {
     command     = <<EOT
       #!/bin/bash
@@ -215,8 +245,10 @@ resource "null_resource" "mlops_app_docker_build" {
 
     EOT
     interpreter = ["/bin/bash", "-c"]
+  }
 
-
+  lifecycle {
+    prevent_destroy = false
   }
 }
 
@@ -253,5 +285,9 @@ resource "null_resource" "vertexai_endpoint_middleware" {
       docker push $IMAGE_ID
     EOT
     interpreter = ["/bin/bash", "-c"]
+  }
+
+  lifecycle {
+    prevent_destroy = false
   }
 }

@@ -19,6 +19,10 @@ resource "archive_file" "trigger_pipeline_zip" {
   type        = "zip"
   source_dir  = "../cloud_functions/trigger_pipeline"
   output_path = "../cloud_functions/trigger_pipeline/trigger_pipeline.zip"
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 # 2. Upload the zip file to the Cloud Storage bucket
@@ -26,6 +30,10 @@ resource "google_storage_bucket_object" "trigger_pipeline_zip" {
   name   = "functions/trigger_pipeline.zip"
   bucket = google_storage_bucket.mlops_gcs_bucket.name
   source = archive_file.trigger_pipeline_zip.output_path
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 /*
@@ -53,10 +61,14 @@ resource "google_cloudfunctions_function" "trigger_pipeline" {
   # Executes uploading the dependencies for the Cloud Function
   depends_on = [
     google_project_service.enabled_services["cloudbuild.googleapis.com"],
-    google_project_service.enabled_services["cloudfunctions.googleapis.com"],
     google_project_iam_binding.artifact_registry_access,
+    google_project_service.cloudfunctions,
     google_storage_bucket_object.trigger_pipeline_zip
   ]
+
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 # ------------------------------------------------------
@@ -146,6 +158,13 @@ resource "google_vertex_ai_feature_online_store" "mlops_online_store" {
     }
   }
 
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
+
+  depends_on = [ google_project_service.enabled_services["aiplatform.googleapis.com"] ]
+
 }
 
 # 2. Define the feature store
@@ -154,7 +173,15 @@ resource "google_vertex_ai_featurestore" "mlops_feature_store" {
   name   = "mlops_feature_store"
   region = var.region
 
-  depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
+
+  depends_on = [
+    google_vertex_ai_feature_online_store.mlops_online_store,
+    google_project_service.enabled_services["aiplatform.googleapis.com"]
+  ]
 }
 
 /*
@@ -171,6 +198,11 @@ resource "google_vertex_ai_featurestore_entitytype" "cdc_training" {
 
   featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
 
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
+
   depends_on = [google_vertex_ai_featurestore.mlops_feature_store]
 }
 
@@ -180,6 +212,11 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_training_featur
   entitytype = google_vertex_ai_featurestore_entitytype.cdc_training.id
   value_type = each.value.type
   name       = each.value.name
+
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
 
   depends_on = [
     google_container_cluster.mlops_gke_cluster,
@@ -194,6 +231,11 @@ resource "google_vertex_ai_featurestore_entitytype" "cdc_inference" {
 
   featurestore = google_vertex_ai_featurestore.mlops_feature_store.id
 
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
+
   depends_on = [google_vertex_ai_featurestore.mlops_feature_store]
 }
 
@@ -203,6 +245,11 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_inference_featu
   entitytype = google_vertex_ai_featurestore_entitytype.cdc_inference.id
   value_type = each.value.type
   name       = each.value.name
+
+  lifecycle {
+    ignore_changes = all # ignore changes if already created
+    prevent_destroy = false
+  }
 
   depends_on = [
     google_container_cluster.mlops_gke_cluster,
@@ -216,6 +263,7 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "cdc_inference_featu
 resource "google_bigquery_dataset" "mlops_feature_store" {
   dataset_id = "mlops_feature_store"
   location   = var.region
+
 }
 
 # Create the BigQuery tables for the feature store
@@ -234,6 +282,10 @@ resource "google_bigquery_table" "cdc_training" {
   ])
 
   deletion_protection = false
+  lifecycle {
+    ignore_changes = all
+    prevent_destroy = false
+  }
 
   depends_on = [google_bigquery_dataset.mlops_feature_store]
 }
@@ -252,6 +304,10 @@ resource "google_bigquery_table" "cdc_inference" {
   ])
 
   deletion_protection = false
+  lifecycle {
+    ignore_changes = all
+    prevent_destroy = false
+  }
 
   depends_on = [google_bigquery_dataset.mlops_feature_store]
 }
@@ -272,6 +328,9 @@ resource "google_vertex_ai_feature_online_store_featureview" "cdc_training_featu
 
   sync_config {
     cron = "0 * * * *"
+  }
+  lifecycle {
+    prevent_destroy = false
   }
 
   depends_on = [
@@ -294,6 +353,9 @@ resource "google_vertex_ai_feature_online_store_featureview" "cdc_inference_feat
 
   sync_config {
     cron = "0 * * * *"
+  }
+  lifecycle {
+    prevent_destroy = false
   }
 
   depends_on = [
@@ -329,6 +391,9 @@ resource "google_monitoring_notification_channel" "email_channel" {
   labels = {
     email_address = var.email
   }
+  lifecycle {
+    prevent_destroy = false
+  }
 }
 
 resource "google_monitoring_alert_policy" "mlops_alert_policy" {
@@ -354,64 +419,12 @@ resource "google_monitoring_alert_policy" "mlops_alert_policy" {
     google_monitoring_notification_channel.email_channel.id
   ]
 
+  lifecycle {
+    prevent_destroy = false
+  }
+
   user_labels = {
     environment = "production"
     type        = "generic_alert"
   }
 }
-
-/*
-
-├── .env.development                  # Environment variables for development
-├── .gitignore
-├── README.md
-├── cloud_functions                   # Google Cloud Functions for MLOps
-│   ├── retraining_notification
-│   │   ├── main.py
-│   │   └── requirements.txt
-│   ├── trigger_pipeline              # Cloud Function to trigger Vertex AI pipeline
-│   │   ├── main.py                   # Trigger function
-│   │   ├── requirements.txt          # Required packages
-│   └── vertex_ai_notification        # Cloud Function for Vertex AI notifications
-│       ├── main.py                   # Notification function
-│       └── requirements.txt          # Required packages
-├── data
-│   └── llcp_2022_2023_cleaned.csv    # Base dataset for training and inference
-├── docker
-│   └── vertexai-middleware           # Dockerfile and scripts for Vertex AI middleware (custom container)
-│       ├── Dockerfile                # Dockerfile for the middleware and application startup
-│       ├── build.sh                  # Build script for the Docker image
-│       ├── ml_inference_data.py      # Data preprocessing script
-│       └── predictor.py              # Router for the application implements /predict
-├── environment.yml
-├── images
-│   ├── dataflow.png
-│   ├── mlops.png
-│   └── platform.png
-├── pipelines                         # Vertex AI pipeline definition
-│   ├── components
-│   │   ├── deploy.py                 # Component for model deployment
-│   │   ├── evaluate.py               # Component for model evaluation
-│   │   ├── preprocess.py             # Component for data preprocessing
-│   │   ├── register.py               # Component for model registration
-│   │   └── train.py                  # Component for model training
-│   ├── pipeline.py                   # Pipeline - Defines the workflow
-│   └── trigger_pipeline.py           # Manually trigger the pipeline (for testing)
-└── terraform                         # Terraform configuration for GCP resources
-    ├── app.tf                        # MLops application deployment
-    ├── database.tf                   # Database setup
-    ├── gcr.tf                        # Artifact (GCR) Registry setup
-    ├── gcs.tf                        # GCS bucket setup
-    ├── gke.tf                        # GKE cluster setup
-    ├── iam.tf                        # IAM roles and permissions
-    ├── kubernetes.tf                 # (GKE) Kubernetes resources
-    ├── networking.tf                 # Networking setup
-    ├── output.tf                     # Outputs from Terraform
-    ├── provider.tf                   # Provider configuration
-    ├── sa.tf                         # Service accounts
-    ├── setup.tf                      # Setup scripts (Docker build, data upload, pipeline trigger)
-    ├── terraform.tfvars.development  # Development environment variables
-    ├── variables.tf                  # Variable declarations
-    ├── versions.tf                   # Provider versions
-    └── vertex_ai.tf                  # Vertex AI resources
-*/

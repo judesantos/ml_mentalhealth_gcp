@@ -33,20 +33,14 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 
 ## Architecture
 
-The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below are the architecture diagrams:
-
-### 1. Platform Architecture
+The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below is an overview of the infrastructure and model training pipeline.
 
 <p align="center">
   <img src="images/platform.png" width=600 "/>
 </p>
-
-### 2. Service Dataflow Diagram
 <p align="center">
   <img src="images/dataflow.png" width=600/>
 </p>
-
-### 3. MLOps Architecture
 <p align="center">
   <img src="images/mlops.png" width=600/>
 </p>
@@ -55,7 +49,7 @@ The system integrates **Mental Health Support Services**, **Cloud Platform**, an
 
 ## Overview
 
-This project provides a **scalable and adaptable ML pipeline** designed for predictive modeling across various domains. By integrating **GCP**, **Vertex AI**, and **Terraform**, the system automates model development, deployment, and continuous retraining. While the current implementation focuses on **mental health prediction**, the framework is extensible to other predictive analytics use cases, such as finance, customer behavior analysis, and more.
+This project automates end-to-end machine learning workflows using GCP, Vertex AI, and Terraform. It is designed to predict mental health conditions and can be extended to other domains like finance and customer analytics.
 
 ### Key Features:
 - **Automated Infrastructure**: Terraform manages cloud resources dynamically.
@@ -121,7 +115,7 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 - **Experience with cloud services** (AWS, GCP, Azure, etc.):
   - Infrastructure setup and configuration.
   - Kubernetes and Docker: Configuration and deployment.
-- **Terraform basics**: Configuration and troubleshooting.
+- **Terraform basics**: [Learn Terraform with HashiCorp](https://developer.hashicorp.com/terraform/tutorials)
 
 ### Developer Environment
 **Note**: This project was developed on a **MacBook Pro M2** running macOS.
@@ -225,6 +219,14 @@ To tear down the deployed infrastructure:
 ```bash
 terraform destroy
 ```
+Go to cloud console and delete/disable resources and services if not so:
+- Cloud SQL             # Application Authentication
+- BigQuery              # Vertex AI Feature Store
+- VPC Network           # VPC
+- Vertex AI             # Feature store, Model Registry, Pipelines
+- GCS                   # Cloud Buckets
+- GKE                   # Kubernetes Cluster
+- Artifacts Registry    # Atifact Registry (AKA: GCR)
 
 ---
 
@@ -234,14 +236,14 @@ terraform destroy
 ├── .env.development                  # Environment variables for development
 ├── .gitignore
 ├── README.md
-├── cloud_functions                   # Google Cloud Functions for MLOps
-│   ├── retraining_notification
+├── cloud_functions                   # Serverless functions for MLOps automation
+│   ├── retraining_notification       # Alerts when retraining is triggered
 │   │   ├── main.py
 │   │   └── requirements.txt
-│   ├── trigger_pipeline              # Cloud Function to trigger Vertex AI pipeline
+│   ├── trigger_pipeline              # Starts the ML pipeline on Vertex AI
 │   │   ├── main.py                   # Trigger function
 │   │   ├── requirements.txt          # Required packages
-│   └── vertex_ai_notification        # Cloud Function for Vertex AI notifications
+│   └── vertex_ai_notification        # Handles notifications for Vertex AI events
 │       ├── main.py                   # Notification function
 │       └── requirements.txt          # Required packages
 ├── data
@@ -322,6 +324,6 @@ Push to the branch.
 Open a Pull Request.
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
 
