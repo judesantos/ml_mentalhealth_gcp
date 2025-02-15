@@ -21,7 +21,7 @@ Architecure:
 
 ## Table of Contents
 
-- [Project Overview](##Overview)
+- [Project Overview](#Overview)
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
 - [MLOps & Deployment](#MLops-&-Deployment)
