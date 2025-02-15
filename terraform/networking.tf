@@ -8,25 +8,31 @@ resource "google_compute_network" "mlops_vpc_network" {
   project                 = var.project_id
   auto_create_subnetworks = false
 
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 
-
-  depends_on = [
-    google_project_service.enabled_services["compute.googleapis.com"]
-  ]
+  depends_on = [google_project_service.compute]
 }
 
 resource "google_compute_subnetwork" "public_subnet" {
   name          = "mlops-public-subnet"
   region        = var.region
-  network       = google_compute_network.mlops_vpc_network.id
+  network       = google_compute_network.mlops_vpc_network.self_link
   ip_cidr_range = "10.0.1.0/24"
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 
 }
 
 resource "google_compute_subnetwork" "private_subnet" {
   name    = "mlops-private-subnet"
   region  = var.region
-  network = google_compute_network.mlops_vpc_network.id
+  network = google_compute_network.mlops_vpc_network.self_link
 
   ip_cidr_range            = "10.0.2.0/24"
   private_ip_google_access = true
@@ -40,6 +46,11 @@ resource "google_compute_subnetwork" "private_subnet" {
     range_name    = "services-range"
     ip_cidr_range = "10.20.16.0/20" # Allocates IPs for GKE Services
   }
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # -----------------------------------
@@ -50,6 +61,11 @@ resource "google_compute_router" "nat_router" {
   name    = "mlops-nat-router"
   network = google_compute_network.mlops_vpc_network.name
   region  = var.region
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 resource "google_compute_router_nat" "nat_config" {
@@ -58,6 +74,11 @@ resource "google_compute_router_nat" "nat_config" {
   region                             = google_compute_router.nat_router.region
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # -----------------------------------
@@ -74,6 +95,11 @@ resource "google_compute_firewall" "allow_internal" {
   }
 
   source_ranges = ["10.0.0.0/16"] # Internal network
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 resource "google_compute_firewall" "allow_external" {
@@ -89,6 +115,11 @@ resource "google_compute_firewall" "allow_external" {
   direction     = "INGRESS"
 
   priority = 1000 # Lower number the higher the priority
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # Office network access to the Kubernetes API
@@ -107,6 +138,11 @@ resource "google_compute_firewall" "allow_k8s_api" {
   #target_tags   = ["private-subnet"]
   source_ranges = ["192.168.1.0/24"] # Allow the office network
   description   = "Allow Kubernetes API access from office network"
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # This rule allows egress traffic from GKE to the internet on port 443
@@ -126,6 +162,11 @@ resource "google_compute_firewall" "allow_egress_to_api" {
     metadata = "INCLUDE_ALL_METADATA"
   }
   destination_ranges = ["0.0.0.0/0"] # Allow egress to any destination
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # This rule allows HTTPS traffic from the Load Balancer to the GKE pods
@@ -149,6 +190,11 @@ resource "google_compute_firewall" "allow_lb_to_gke" {
     "10.20.0.0/20", # GKE Pods CIDR
     "10.20.16.0/20" # GKE Services CIDR
   ]
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # -----------------------------------
@@ -207,8 +253,13 @@ resource "google_compute_security_policy" "cloud_armor" {
     description = "Default allow rule"
   }
 
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
+
   depends_on = [
-    google_project_service.enabled_services["compute.googleapis.com"],
+    google_project_service.compute,
     google_project_iam_member.mlops_permissions,
   ]
 }
@@ -244,7 +295,12 @@ resource "google_compute_url_map" "url_map" {
     }
   }
 
-  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
+
+  depends_on = [google_project_service.compute]
 }
 
 # 404 error backend service for unmatched paths
@@ -253,6 +309,11 @@ resource "google_compute_backend_service" "error_backend" {
   load_balancing_scheme = "EXTERNAL"
   protocol              = "HTTP"
   health_checks         = [google_compute_health_check.error_check.id]
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 resource "google_compute_health_check" "error_check" {
@@ -260,6 +321,13 @@ resource "google_compute_health_check" "error_check" {
   http_health_check {
     port = 9999 # Fake port that doesn't respond
   }
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
+
+  depends_on = [ google_project_service.compute ]
 }
 
 # Load balancer public IP address for incoming traffic
@@ -267,6 +335,11 @@ resource "google_compute_global_address" "default" {
   name         = "mlops-global-ip"
   address_type = "EXTERNAL"
   ip_version   = "IPV4"
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 
   depends_on = [google_project_service.enabled_services]
 }
@@ -284,7 +357,12 @@ resource "google_compute_ssl_certificate" "ml_ops_ssl_certificate" {
   private_key = file("../certs/app_private_key.pem")
   certificate = file("../certs/app_certificate.pem")
 
-  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
+
+  depends_on = [google_project_service.compute]
 }
 
 /*
@@ -299,6 +377,11 @@ resource "google_compute_target_https_proxy" "https_proxy" {
   name             = "https-proxy"
   url_map          = google_compute_url_map.url_map.self_link
   ssl_certificates = [google_compute_ssl_certificate.ml_ops_ssl_certificate.self_link]
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 /*
@@ -314,6 +397,11 @@ resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
 
   target     = google_compute_target_https_proxy.https_proxy.self_link
   ip_address = google_compute_global_address.default.address
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 
@@ -358,6 +446,11 @@ resource "google_compute_backend_service" "mlops_app_backend" {
 
   # Attach Cloud Armor
   security_policy = google_compute_security_policy.cloud_armor.id
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }
 
 # -----------------------------------
@@ -372,6 +465,11 @@ resource "google_compute_region_network_endpoint_group" "vertexai_neg" {
   network_endpoint_type = "SERVERLESS"
   cloud_function {
     function = google_cloudfunctions_function.trigger_pipeline.name
+  }
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
   }
 }
 
@@ -389,4 +487,9 @@ resource "google_compute_backend_service" "vertexai_backend" {
 
   # Attach Cloud Armor
   security_policy = google_compute_security_policy.cloud_armor.id
+
+  lifecycle {
+    prevent_destroy = false
+    ignore_changes = all
+  }
 }

@@ -39,7 +39,7 @@ resource "google_compute_backend_bucket" "gcs_backend" {
   name        = "gcs-backend-bucket"
   bucket_name = google_storage_bucket.mlops_gcs_bucket.name
 
-  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
+  depends_on = [google_project_service.compute]
 }
 
 # ------------------------------------

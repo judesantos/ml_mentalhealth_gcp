@@ -56,3 +56,4 @@ data/*
 terraform/pipeline.yaml
 terraform/post
 docker/mlops_app
+diagrams/

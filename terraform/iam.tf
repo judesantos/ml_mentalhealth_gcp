@@ -1,7 +1,15 @@
 
 # -----------------------------------
-# IAM Permissions
+#   Permissions
 # -----------------------------------
+
+/*
+Admin permissions for the MLOps service account
+*/
+resource "google_project_service" "iam" {
+  service = "iam.googleapis.com"
+  project = var.project_id
+}
 
 /*
 Member permissions for the MLOps service account
@@ -60,6 +68,8 @@ resource "google_project_iam_binding" "artifact_registry_access" {
     "serviceAccount:service-${var.project_number}@gcf-admin-robot.iam.gserviceaccount.com",
     "serviceAccount:${var.project_number}@cloudservices.gserviceaccount.com",
   ]
+
+  depends_on = [ google_service_account.gcf_admin_robot ]
 }
 
 /*
@@ -72,7 +82,7 @@ resource "google_secret_manager_secret_iam_member" "github_token_accessor" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:service-416879185829@gcp-sa-cloudbuild.iam.gserviceaccount.com"
 
-  depends_on = [google_project_service.enabled_services["compute.googleapis.com"]]
+  depends_on = [google_project_service.compute]
 }
 
 /*

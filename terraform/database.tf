@@ -21,8 +21,9 @@ resource "google_service_networking_connection" "private_vpc_connection" {
     prevent_destroy = false
   }
 
-
-  depends_on = [google_compute_global_address.private_ip_alloc]
+  depends_on = [
+    google_compute_global_address.private_ip_alloc,
+  ]
 }
 
 # Create Cloud SQL PostgreSQL Instance
@@ -47,20 +48,34 @@ resource "google_sql_database_instance" "pg_instance" {
     }
   }
 
-  depends_on = [google_service_networking_connection.private_vpc_connection]
+  lifecycle {
+    #ignore_changes = all
+    prevent_destroy = false
+  }
+
+  depends_on = [
+    google_service_networking_connection.private_vpc_connection,
+  ]
 }
 
 # Create PostgreSQL Database
 resource "google_sql_database" "pg_database" {
   name     = "pg-database"
+  project = var.project_id
+
   instance = google_sql_database_instance.pg_instance.name
 
-  depends_on = [google_sql_user.pg_user]
+  depends_on = [
+    google_sql_user.pg_user,
+    google_service_networking_connection.private_vpc_connection,
+  ]
 }
 
 # Create PostgreSQL User (Secure via Secret Manager)
 resource "google_sql_user" "pg_user" {
   name     = var.pgsql_user
+  project = var.project_id
+
   instance = google_sql_database_instance.pg_instance.name
   password = var.pgsql_password # Store in Secret Manager instead
 
@@ -70,8 +85,11 @@ resource "google_sql_user" "pg_user" {
 # Create the SQL DB instance
 data "google_sql_database_instance" "pg_instance" {
   name = google_sql_database_instance.pg_instance.name
+  project = var.project_id
 
-  depends_on = [google_sql_user.pg_user]
+  depends_on = [
+    google_sql_user.pg_user
+  ]
 }
 
 # Provide the database URL as a secret
@@ -83,4 +101,6 @@ resource "kubernetes_secret" "mlops_app_secret" {
   data = {
     DATABASE_URL = "postgresql://${var.pgsql_user}:${var.pgsql_password}@${data.google_sql_database_instance.pg_instance.private_ip_address}:5432/pg-database"
   }
+
+  depends_on = [ google_sql_database.pg_database ]
 }
