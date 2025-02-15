@@ -141,7 +141,7 @@ Before deploying, ensure the following:
    - Create a service account key file with the required permissions and download it as `credentials.json`.
 
 4. **Access to the Mental Health Application GitHub Repo**:
-   - [ML Mental Health App Repo](https://github.com/judesantos/ml_mentalhealth_app)
+   - [ML Mental Health](https://github.com/judesantos/ml_mentalhealth_app) Application Repository
    - Add Cloud Build app to your GitHub account. [See Google Cloud Documentation](https://cloud.google.com/build/docs/automating-builds/github/connect-repo-github).
    - Create a Personal Access Token from your GitHub account.
 
