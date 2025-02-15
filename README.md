@@ -24,7 +24,7 @@ Architecure:
 - [Project Overview](#Overview)
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
-- [MLOps & Deployment](#MLops-&-Deployment)
+- [MLOps-&-Deployment](#MLops-&-Deployment)
 - [CI/CD Pipeline](#cicd-pipeline)
 - [Prerequisites](#Prerequisites)
 - [Project Structure](#Project-Structure)
@@ -69,7 +69,7 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
 
 ---
 
-## Data Science Approach
+## Datascience Approach
 
 ### Feature Engineering
 - Key mental health indicators, lifestyle behaviors, and healthcare access patterns are extracted and transformed into meaningful features.
