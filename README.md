@@ -36,13 +36,7 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below is an overview of the infrastructure and model training pipeline.
 
 <p align="center">
-  <img src="images/platform.png" width=600 "/>
-</p>
-<p align="center">
-  <img src="images/dataflow.png" width=600/>
-</p>
-<p align="center">
-  <img src="images/mlops.png" width=600/>
+  <img src="images/architecture.png" width=600 "/>
 </p>
 
 ---
