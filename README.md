@@ -3,40 +3,36 @@
 
 This project implements a **Machine Learning (ML) Mental Health Modeling Pipeline** on **Google Cloud Platform (GCP)**, leveraging **Vertex AI** for model development and deployment, and **Terraform** for infrastructure provisioning and management. The pipeline is fully automated, enabling infrastructure-as-code (IaC) practices for scalability and reproducibility.
 
----
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Architecture](#architecture)
-- [Technologies Used](#technologies-used)
-- [Data Processing](#data-processing)
-- [Model Development](#model-development)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [MLOps Practices](#mlops-practices)
-- [Getting Started](#getting-started)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-### Application
+Below is an overview of the infrastructure and model training pipeline.
 
 <p align="center">
+  <h3>Application</h3>
   <img src="images/app.png" width=600 />
 </p>
 
----
-
-## Architecture
-
-The system integrates **Mental Health Support Services**, **Cloud Platform**, and **MLOps Infrastructure** for seamless scalability and integration. Below is an overview of the infrastructure and model training pipeline.
-
 <p align="center">
+  <h3>Architecure</h3>
   <img src="images/architecture.png" width=600 "/>
 </p>
 
 ---
+
+## Table of Contents
+
+- [Project Overview](##Overview)
+- [Datascience Approach](#Datascience-Approach)
+- [Model Development](#model-development)
+- [MLOps & Deployment](#MLops-&-Deployment)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Prerequisites](#Prerequisites)
+- [Project Structure](#Project-Structure)
+- [Getting Started](#getting-started)
+- [Contributing](#contributing)
+- [License](#license)
+
+
+---
+
 
 ## Overview
 
@@ -50,7 +46,7 @@ This project automates end-to-end machine learning workflows using GCP, Vertex A
 
 ---
 
-## Current Implementation: Mental Health Prediction
+### Current Implementation: Mental Health Prediction
 
 Mental health issues are widespread and complex, yet timely and personalized support remains limited. This implementation focuses on predicting mental health conditions using ML models trained on large-scale mental health survey data. The system provides insights for early intervention, helping healthcare providers, policymakers, and individuals proactively address mental health needs.
 
@@ -62,7 +58,7 @@ Mental health issues are widespread and complex, yet timely and personalized sup
 
 ---
 
-## Dataset & Data Pipeline
+### Dataset & Data Pipeline
 
 The ML pipeline is built on a continuously evolving dataset framework that integrates new and diverse data sources over time.
 
@@ -150,7 +146,64 @@ Before deploying, ensure the following:
 
 ---
 
-## Deployment Steps
+## Project Structure
+```
+├── .env.development                  # Environment variables for development
+├── .gitignore
+├── README.md
+├── cloud_functions                   # Serverless functions for MLOps automation
+│   ├── retraining_notification       # Alerts when retraining is triggered
+│   │   ├── main.py
+│   │   └── requirements.txt
+│   ├── trigger_pipeline              # Starts the ML pipeline on Vertex AI
+│   │   ├── main.py                   # Trigger function
+│   │   ├── requirements.txt          # Required packages
+│   └── vertex_ai_notification        # Handles notifications for Vertex AI events
+│       ├── main.py                   # Notification function
+│       └── requirements.txt          # Required packages
+├── data
+│   └── llcp_2022_2023_cleaned.csv    # Base dataset for training and inference
+├── docker
+│   └── vertexai-middleware           # Dockerfile and scripts for Vertex AI middleware (custom container)
+│       ├── Dockerfile                # Dockerfile for the middleware and application startup
+│       ├── build.sh                  # Build script for the Docker image
+│       ├── ml_inference_data.py      # Data preprocessing script
+│       └── predictor.py              # Router for the application implements /predict
+├── environment.yml                   # Python environment packages required for this project
+├── images
+│   ├── dataflow.png
+│   ├── mlops.png
+│   └── platform.png
+├── pipelines                         # Vertex AI pipeline definition
+│   ├── components
+│   │   ├── deploy.py                 # Component for model deployment
+│   │   ├── evaluate.py               # Component for model evaluation
+│   │   ├── preprocess.py             # Component for data preprocessing
+│   │   ├── register.py               # Component for model registration
+│   │   └── train.py                  # Component for model training
+│   ├── pipeline.py                   # Pipeline - Defines the workflow
+│   └── trigger_pipeline.py           # Manually trigger the pipeline (for testing)
+└── terraform                         # Terraform configuration for GCP resources
+    ├── app.tf                        # MLops application deployment
+    ├── database.tf                   # Database setup
+    ├── gcr.tf                        # Artifact (GCR) Registry setup
+    ├── gcs.tf                        # GCS bucket setup
+    ├── gke.tf                        # GKE cluster setup
+    ├── iam.tf                        # IAM roles and permissions
+    ├── kubernetes.tf                 # (GKE) Kubernetes resources
+    ├── networking.tf                 # Networking setup
+    ├── output.tf                     # Outputs from Terraform
+    ├── provider.tf                   # Provider configuration
+    ├── sa.tf                         # Service accounts
+    ├── setup.tf                      # Setup scripts (Docker build, data upload, pipeline trigger)
+    ├── terraform.tfvars.development  # Development environment variables
+    ├── variables.tf                  # Variable declarations
+    ├── versions.tf                   # Provider versions
+    └── vertex_ai.tf                  # Vertex AI resources
+```
+---
+
+## Getting Started
 
 Follow these steps to deploy the infrastructure:
 
@@ -221,64 +274,7 @@ Go to cloud console and delete/disable resources and services if not so:
 
 ---
 
-## Project Structure
-```
 
-├── .env.development                  # Environment variables for development
-├── .gitignore
-├── README.md
-├── cloud_functions                   # Serverless functions for MLOps automation
-│   ├── retraining_notification       # Alerts when retraining is triggered
-│   │   ├── main.py
-│   │   └── requirements.txt
-│   ├── trigger_pipeline              # Starts the ML pipeline on Vertex AI
-│   │   ├── main.py                   # Trigger function
-│   │   ├── requirements.txt          # Required packages
-│   └── vertex_ai_notification        # Handles notifications for Vertex AI events
-│       ├── main.py                   # Notification function
-│       └── requirements.txt          # Required packages
-├── data
-│   └── llcp_2022_2023_cleaned.csv    # Base dataset for training and inference
-├── docker
-│   └── vertexai-middleware           # Dockerfile and scripts for Vertex AI middleware (custom container)
-│       ├── Dockerfile                # Dockerfile for the middleware and application startup
-│       ├── build.sh                  # Build script for the Docker image
-│       ├── ml_inference_data.py      # Data preprocessing script
-│       └── predictor.py              # Router for the application implements /predict
-├── environment.yml                   # Python environment packages required for this project
-├── images
-│   ├── dataflow.png
-│   ├── mlops.png
-│   └── platform.png
-├── pipelines                         # Vertex AI pipeline definition
-│   ├── components
-│   │   ├── deploy.py                 # Component for model deployment
-│   │   ├── evaluate.py               # Component for model evaluation
-│   │   ├── preprocess.py             # Component for data preprocessing
-│   │   ├── register.py               # Component for model registration
-│   │   └── train.py                  # Component for model training
-│   ├── pipeline.py                   # Pipeline - Defines the workflow
-│   └── trigger_pipeline.py           # Manually trigger the pipeline (for testing)
-└── terraform                         # Terraform configuration for GCP resources
-    ├── app.tf                        # MLops application deployment
-    ├── database.tf                   # Database setup
-    ├── gcr.tf                        # Artifact (GCR) Registry setup
-    ├── gcs.tf                        # GCS bucket setup
-    ├── gke.tf                        # GKE cluster setup
-    ├── iam.tf                        # IAM roles and permissions
-    ├── kubernetes.tf                 # (GKE) Kubernetes resources
-    ├── networking.tf                 # Networking setup
-    ├── output.tf                     # Outputs from Terraform
-    ├── provider.tf                   # Provider configuration
-    ├── sa.tf                         # Service accounts
-    ├── setup.tf                      # Setup scripts (Docker build, data upload, pipeline trigger)
-    ├── terraform.tfvars.development  # Development environment variables
-    ├── variables.tf                  # Variable declarations
-    ├── versions.tf                   # Provider versions
-    └── vertex_ai.tf                  # Vertex AI resources
-```
-
----
 
 ## Notes
 
