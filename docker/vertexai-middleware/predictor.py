@@ -15,7 +15,7 @@ before being submitted to the model for prediction.
     - The container must return JSON data for prediction
 
     Vertex AI Predefined Environment Variables:
-    - AIP_MODEL_DIR: The path to the model artifact in the container
+    - AIP_STORAGE_URI: The path to the model artifact in the container
     - AIP_HTTP_PORT: The port on which the container listens
     - AIP_HEALTH_ROUTE: The health check endpoint
     - AIP_PREDICT_ROUTE: The prediction endpoint
@@ -24,17 +24,19 @@ Runs on Gunicorn to manage concurrent requests
 """
 
 import os
-
+import joblib
 import logging
 from typing import List, Dict
+from threading import Lock
 
 import pandas as pd
 import xgboost as xgb
 
+from flask import Flask, request, jsonify
+from google.cloud import storage
+
 from ml_inference_data import MentalHealthData
 
-from flask import Flask, request, jsonify
-from threading import Lock
 
 # Create a Flask app
 app = Flask(__name__)
@@ -45,7 +47,7 @@ model_lock = Lock()
 xgb_model = None
 
 # Enable logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------
@@ -69,23 +71,63 @@ EXPECTED_FEATURE_ORDER = [
 # Define preprocessing function
 # -----------------------------
 
+# Fallback model uri, AIP_STORAGE_URI is not set (Why - ask Google)
+GCS_MODEL_PATH = os.getenv('AIP_STORAGE_URI')
+
 
 def _load_model():
     """
     Load the trained model from the model artifact in the container.
     Loads the trained model from the environment variable AIP_MODEL_DIR which
-    was set in the Vertex AI registration step.
+    is set in the Vertex AI registration step.
     """
     global xgb_model
-    if xgb_model is None:
-        # Check if the model path is set
-        model_path = os.getenv('AIP_MODEL_DIR')
-        if model_path is None or not os.path.exists('AIP_MODEL_DIR'):
-            raise ValueError('Model path (AIP_MODEL_DIR) not found. Exiting.')
+    global GCS_MODEL_PATH
 
-        # Load the model from the given path
-        xgb_model = xgb.Booster()
-        xgb_model.load_model(model_path)
+    MODEL_URI = 'gs://mlops-gcs-bucket/models/xgb-model/'
+
+    # MODEL_PATH = '/tmp/model.joblib'
+    if xgb_model is None:
+        if not GCS_MODEL_PATH:
+            print('AIP_STORAGE_URI environment variable not set.')
+            print(f'Loading model from {MODEL_URI}...')
+            GCS_MODEL_PATH = MODEL_URI
+
+        # Extract bucket name and prefix from GCS path
+
+        parts = GCS_MODEL_PATH[5:].split("/", 1)
+        bucket_name = parts[0]
+        prefix = parts[1] if len(parts) > 1 else ""
+
+        print(f'Setting bucket name: {bucket_name}...')
+
+        # Initialize GCS client
+
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+
+        # List all blobs in the bucket
+
+        blobs = list(bucket.list_blobs(prefix=prefix))
+
+        if not blobs:
+            raise ValueError('No files found in the bucket.')
+
+        # Find the model file with the correct extension
+
+        exts = ['.joblib']  # joblib is our model file extension
+        model_blob = next(
+            (b for b in blobs if b.name.endswith(tuple(exts))), None)
+
+        if not model_blob:
+            raise ValueError('No model file found in the bucket.')
+
+        # Download the model file to /tmp
+        model_path = os.path.join('/tmp', os.path.basename(model_blob.name))
+        model_blob.download_to_filename(model_path)
+
+        # Load the model
+        xgb_model = joblib.load(model_path)
 
     return xgb_model
 
@@ -106,7 +148,7 @@ def _predict(mh: MentalHealthData, model):
     return model.predict(xgb_features)
 
 
-def _preprocess_input(data: List[Dict[str, str]]):
+def _preprocess_input(data: List):
     """
     Preprocess incoming inference data by applying necessary transformations.
     Args:
@@ -114,9 +156,10 @@ def _preprocess_input(data: List[Dict[str, str]]):
     Returns:
         np.array: Transformed feature array for model prediction.
     """
-    _data = _reorder_features(data)
-    # Convert data to DataFrame
-    df = pd.DataFrame(_data, columns=EXPECTED_FEATURE_ORDER)
+    # Convert the input data to a pandas DataFrame
+    _df = pd.DataFrame(data).astype(int)
+    # Reorder the features to match the expected model order
+    df = _df[EXPECTED_FEATURE_ORDER]
 
     # Prepare our inference data
     # MentalHealthData can process both feature with target data,
@@ -125,34 +168,6 @@ def _preprocess_input(data: List[Dict[str, str]]):
     # data
     return MentalHealthData(df)
 
-
-def _reorder_features(batch: List[Dict[str, str]]):
-    """
-    Reorder input data to match the expected feature order.
-    The submitted batch data is expected to be without missing values
-
-    The reordering requires the incoming batch to be in dictionary format
-    so as to be able to determine the feature names of each input value.
-    Once the proper order is determnined, we can now do away with the
-    column names in the batch and return only the values in
-    the correct order.
-    Args:
-        data list[dict]: Input data as a dictionary.
-        expected_order (list): List of features in the correct order.
-    Returns:
-        list[List]: Batch of features in the correct order.
-    """
-
-    ordered_batch = []
-
-    for features in batch:
-        _features = [int(features[feature]) for feature in
-                     EXPECTED_FEATURE_ORDER if feature in features]
-        # Append the ordered feature values to the batch
-        ordered_batch.append(_features)
-
-    logger.debug(f'Ordered batch: {ordered_batch}')
-    return ordered_batch
 
 # ----------------------------------------------------------------
 # Define HTTP route - /predict, /health (As required by Vertex AI)
@@ -166,6 +181,7 @@ def health_check():
     Define a health check endpoint for the container.
     This is a required endpoint for Vertex AI custom containers.
     """
+    print('Health check endpoint called. Returning 200 OK.')
     return jsonify({"status": "healthy"}), 200
 
 
@@ -186,15 +202,34 @@ def predict():
         JSON: The model prediction.
     """
     try:
-        # Load the model
-        model = _load_model()
+        logger.info('Predict endpoint called.')
+        # Print raw request headers and body
+        logger.debug(f'Request Headers: {request.headers}')
+        logger.debug(f'Request JSON: {request.get_json(
+            silent=True)}')  # Parsed JSON
 
-        # Get JSON data
-        input_data = request.get_json()
+        # Validate input
+
+        if request.content_type != "application/json":
+            logger.error('Invalid content type. Expected application/json.')
+            return jsonify({"error": "Unsupported Media Type. Please use 'application/json'"}), 415
+
+        input_data = request.get_json(silent=True)
         if not input_data:
             logger.error('No input data provided.')
             return jsonify({'error': 'No input data provided.'}), 400
-        if len(input_data) != 55:
+
+        # Single instance prediction
+        if "features" in input_data:
+            input_data = [input_data["features"]]
+        # Batch prediction
+        elif "instances" in input_data:
+            input_data = input_data["instances"]
+        else:
+            logger.error('Invalid input data format.')
+            return jsonify({'error': 'Invalid input data format.'}), 400
+
+        if len(input_data[0]) != 55:
             logger.error('Invalid number of parameters.')
             return jsonify({'error': 'Invalid number of parameters.'}), 400
 
@@ -203,12 +238,18 @@ def predict():
 
         # Make prediction
         with model_lock:
-            prediction = _predict(processed_data, model)
+            # Load the model
+            model = _load_model()
+            # Predict!
+            logger.info('Making prediction...')
+            predictions = _predict(processed_data, model)
+
+        logger.debug(f'Predictions: {predictions}')
 
         # Return response
         return jsonify({
             'success': 'true',
-            'prediction': prediction.tolist()
+            'prediction': predictions.tolist()
         })
 
     except Exception as e:
@@ -224,5 +265,11 @@ def predict():
 
 
 if __name__ == '__main__':
+    # Load the model singleton
+    _load_model()
     # Vertext AI custom containers require the app to listen on port 8080
-    app.run(host='0.0.0.0', port=8080)
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=8080
+    )
