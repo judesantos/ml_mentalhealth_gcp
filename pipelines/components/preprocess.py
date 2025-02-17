@@ -55,7 +55,7 @@ def preprocess_data(
     import pandas as pd
     from google.cloud import storage, bigquery
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, force=True)
     logger = logging.getLogger(__name__)
 
     FEATURE_NAMES = [
@@ -164,6 +164,6 @@ def preprocess_data(
 
     except Exception as e:
         logger.error(f'Error in preprocessing data: {str(e)}')
-        return False
+        raise e
 
     return True

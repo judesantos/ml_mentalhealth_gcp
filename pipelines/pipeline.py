@@ -56,7 +56,8 @@ def run_mental_health_pipeline(
     bucket_name: str,
     featurestore_id: str,
     entity_type_id: str,
-    container_image_uri: str
+    container_image_uri: str,
+    endpoint_name: str
 ):
     """
     Pipeline to preprocess, train, evaluate, register, build container,
@@ -148,7 +149,7 @@ def run_mental_health_pipeline(
         register_task = register_model(
             project_id=project_id,
             region=region,
-            display_name='xgboost-model',
+            display_name=f'{endpoint_name}-model',
             model_artifact=model_artifact,
             container_image_uri=container_image_uri,
         ).after(evaluate_task)
@@ -166,6 +167,7 @@ def run_mental_health_pipeline(
         deploy_task = deploy_model(
             project_id=project_id,
             region=region,
+            endpoint_name=endpoint_name,
             model_resource=model_resource
         ).after(register_task)
 
@@ -178,7 +180,7 @@ def run_mental_health_pipeline(
 
 
 @pipeline(
-    name='mode-training-pipeline',
+    name='model-training-pipeline',
     description='''Pipeline to preprocess, train, evaluate,
     build container, register, and deploy model.''',
 )
@@ -188,7 +190,8 @@ def mental_health_pipeline(
     bucket_name: str,
     featurestore_id: str,
     entity_type_id: str,
-    container_image_uri: str
+    container_image_uri: str,
+    endpoint_name: str,
 ):
     run_mental_health_pipeline(
         project_id,
@@ -196,7 +199,8 @@ def mental_health_pipeline(
         bucket_name,
         featurestore_id,
         entity_type_id,
-        container_image_uri
+        container_image_uri,
+        endpoint_name
     )
 
 
