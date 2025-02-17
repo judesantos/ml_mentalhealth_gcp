@@ -36,7 +36,7 @@ def evaluate_model(
     from sklearn.metrics import accuracy_score, precision_score
     from sklearn.metrics import recall_score, f1_score
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, force=True)
     logger = logging.getLogger(__name__)
 
     def evaluate_model(model_xgb, _x_test, y_test):
@@ -82,6 +82,6 @@ def evaluate_model(
 
     except Exception as e:
         logger.exception('Failed to evaluate the model.')
-        return False
+        raise e
 
     return True

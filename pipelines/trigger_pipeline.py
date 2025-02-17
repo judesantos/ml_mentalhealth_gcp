@@ -27,12 +27,13 @@ REGION = 'us-central1'
 BUCKET_NAME = 'mlops-gcs-bucket/pipelines/data/'
 FEATURESTORE_ID = 'mlops_feature_store'
 ENTITY_TYPE_ID = 'cdc_training'
-CONTAINER_IMAGE_URI = 'us-central1-docker.pkg.dev/ml-mentalhealth/mlops-repo/mlops-endpoint:v0.1.9'
+ENDPOINT_NAME = 'mlops-endpoint'
+CONTAINER_IMAGE_URI = f'us-central1-docker.pkg.dev/ml-mentalhealth/mlops-repo/{ENDPOINT_NAME}:v0.1.9'
 
 # Create the pipeline job
 
 job = aiplatform.PipelineJob(
-    enable_caching=True,
+    enable_caching=False,
     failure_policy='fast',
     display_name='mental-health-pipeline',
     template_path='pipeline.json',
@@ -43,7 +44,8 @@ job = aiplatform.PipelineJob(
         'bucket_name': BUCKET_NAME,
         'featurestore_id': FEATURESTORE_ID,
         'entity_type_id': ENTITY_TYPE_ID,
-        'container_image_uri': CONTAINER_IMAGE_URI
+        'container_image_uri': CONTAINER_IMAGE_URI,
+        'endpoint_name': ENDPOINT_NAME
     },
 )
 

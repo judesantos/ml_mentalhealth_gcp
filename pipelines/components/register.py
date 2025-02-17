@@ -45,7 +45,7 @@ def register_model(
 
     from google.cloud import aiplatform, storage
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, force=True)
     logger = logging.getLogger(__name__)
 
     # Define the destination path in GCS
@@ -93,10 +93,7 @@ def register_model(
         location=region,
         display_name=display_name,
         artifact_uri=model_artifact_uri,
-        serving_container_image_uri=container_image_uri,
-        serving_container_environment_variables={
-            'MODEL_URI': model_artifact_uri
-        }
+        serving_container_image_uri=container_image_uri
     )
 
     model_resource.uri = model.resource_name

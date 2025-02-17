@@ -66,7 +66,7 @@ def train_model(
 
     from google.cloud import bigquery
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, force=True)
     logger = logging.getLogger(__name__)
 
     TARGET = 'ment14d'
@@ -94,6 +94,74 @@ def train_model(
     # xgboost class label mapping to description
     # _alt_target_class_mapping = {0: '0 Days',
     #                              1: '1-13 Days', 2: '14+ Days', 3: 'Unsure'}
+
+    class MentalHealthData():
+        """
+        Mental Health Data class defines the dataset characteristics including
+        the feature groups by type and the target variable
+
+        Attributes:
+        target (str): target variable
+        categorical_features (list): list of categorical features
+        """
+
+        def __init__(self, df):
+            """
+            Initialize the dataset and define the dataset characteristics
+
+            Task:
+            - Load and prepare the dataset
+            - Define the dataset characteristics
+            """
+
+            # 1. Make a copy of the dataset
+            self._df = df.copy()
+
+            # Integrate composite features
+            self._integrate_composite_features()
+
+            # 2. Define the target variable
+            self.target = 'ment14d'
+
+            # Define the feature groups
+
+            # 3. Numeric features need scaler
+            continuous_features = ['physhlth', 'poorhlth', 'marijan1']
+            aggregated_features = [
+                'Mental_Health_Composite',
+                'Income_Education_Interaction',
+                'Physical_Mental_Interaction',
+            ]
+            non_categorical_features = continuous_features + aggregated_features
+
+            # 4. Categorical features
+            self.categorical_features = [
+                col for col in self._df.columns
+                if col not in (non_categorical_features + [self.target])
+            ]
+
+        def get_data(self):
+            """
+            Return the dataset
+
+            Returns:
+            pd.DataFrame: dataset
+            """
+            return self._df
+
+        def _integrate_composite_features(self):
+            # Create a new copy of the cleaned dataset
+            mental_health_features = ['emtsuprt', 'addepev3', 'poorhlth']
+            # Using Nonlinear interaction
+            self._df['Physical_Mental_Interaction'] = self._df['genhlth'].astype(
+                int) * self._df['physhlth']
+            # Income and Education Interaction
+            self._df['Income_Education_Interaction'] = self._df['income3'].astype(
+                int) * self._df['educa'].astype(int)
+            # Mental Health
+            self._df['Mental_Health_Composite'] = self._df[
+                mental_health_features
+            ].mean(axis=1)
 
     def target_label_mapping(y=None):
         ''' Convert target dataset labels to xgboost which starts from 0 '''
@@ -344,7 +412,12 @@ def train_model(
 
         # TODO: Temporary - reduce the dataset size for testing
         tmp_training_df = client.query(query).to_dataframe()
-        training_df = tmp_training_df.sample(frac=0.04)
+        df = tmp_training_df.sample(frac=0.04)
+
+        # 1a. Incorporate composite features
+
+        mh = MentalHealthData(df)
+        training_df = mh.get_data()
 
         logger.info(
             f'Feature Store records fetched successfully. count={training_df.shape[0]}')
@@ -418,6 +491,6 @@ def train_model(
 
     except Exception as e:
         logger.error(f'Error training model: {str(e)}')
-        return False
+        raise e
 
     return True
