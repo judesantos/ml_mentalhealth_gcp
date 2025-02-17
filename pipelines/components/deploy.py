@@ -55,6 +55,7 @@ def deploy_model(
 
     # Deploy the model
     model.deploy(
+        region=region,
         endpoint=endpoint,
         machine_type='n1-standard-4',
         min_replica_count=1,
