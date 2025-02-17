@@ -381,6 +381,20 @@ resource "google_vertex_ai_endpoint" "endpoint" {
   depends_on = [google_project_service.enabled_services["aiplatform.googleapis.com"]]
 }
 
+# Read from GCS bucket
+resource "google_storage_bucket_iam_member" "vertex_ai_gcs_access" {
+  bucket = google_storage_bucket.mlops_gcs_bucket.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:vertex-ai-sa@${var.project_id}.iam.gserviceaccount.com"
+}
+
+# Service account user permissions
+resource "google_project_iam_member" "vertex_ai_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member = "serviceAccount:vertex-ai-sa@${var.project_id}.iam.gserviceaccount.com"
+}
+
 # -----------------------------------
 # Vertex AI Monitoring
 # -----------------------------------
