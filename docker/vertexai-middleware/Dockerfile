@@ -16,8 +16,8 @@ COPY predictor.py .
 COPY ml_inference_data.py .
 
 # Install the application required Python packages
-RUN pip install --no-cache-dir flask pandas numpy scikit-learn xgboost gunicorn
+RUN pip install --no-cache-dir joblib flask pandas numpy scikit-learn xgboost gunicorn google-cloud-storage
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--log-level=debug", "--workers=4", "--threads=2", "--bind=0.0.0.0:8080", "predictor:app"]
+ENTRYPOINT ["gunicorn", "--log-level=debug", "--workers=1", "--threads=1", "--bind=0.0.0.0:8080", "predictor:app"]
