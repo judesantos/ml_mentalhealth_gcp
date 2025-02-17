@@ -118,3 +118,9 @@ resource "google_cloudfunctions_function_iam_member" "invoker" {
   role   = "roles/cloudfunctions.invoker"
   member = "allUsers"
 }
+
+resource "google_project_iam_member" "vertex_ai_service_agent" {
+  project = var.project_id  # Your Google Cloud project ID
+  role    = "roles/aiplatform.serviceAgent"
+  member  = "serviceAccount:service-${var.project_number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+}
