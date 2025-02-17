@@ -93,6 +93,7 @@ resource "null_resource" "generate_pipeline_json" {
 
   lifecycle {
     prevent_destroy = false
+    ignore_changes = all
   }
 
   depends_on = [ google_storage_bucket.mlops_gcs_bucket ]
