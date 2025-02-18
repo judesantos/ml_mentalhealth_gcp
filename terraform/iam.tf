@@ -42,7 +42,8 @@ resource "google_project_iam_member" "mlops_permissions" {
     "roles/cloudfunctions.invoker",
     "roles/bigquery.dataViewer",
     "roles/bigquery.jobUser",
-    "roles/bigquery.dataEditor"
+    "roles/bigquery.dataEditor",
+    "roles/vpcaccess.user"
   ])
   role = each.key
 

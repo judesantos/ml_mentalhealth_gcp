@@ -493,3 +493,16 @@ resource "google_compute_backend_service" "vertexai_backend" {
     ignore_changes = all
   }
 }
+
+# Allows GKE to connect to Cloud Run
+resource "google_vpc_access_connector" "gke_serverless_connector" {
+  name          = "gke-cloudrun-connector"
+  region        = var.region
+  network       = google_compute_network.mlops_vpc_network.id
+  ip_cidr_range = "10.8.0.0/28"
+
+  max_throughput = 300
+  min_throughput = 200
+
+  depends_on = [ google_project_service.enabled_services["vpcaccess.googleapis.com"] ]
+}
