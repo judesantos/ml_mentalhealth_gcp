@@ -56,7 +56,7 @@ def register_model(
     # Define the source path of the model artifact
     model_src_path = model_artifact.path
     # Extract the filename from the model path
-    model_filename = os.path.basename(model_src_path)
+    # model_filename = os.path.basename(model_src_path)
 
     # Define the GCS path of the destination model artifact
     gcs_model_path = f'{model_dst_path}/{model_dst_filename}'

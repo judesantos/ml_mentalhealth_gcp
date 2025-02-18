@@ -33,7 +33,7 @@ CONTAINER_IMAGE_URI = f'us-central1-docker.pkg.dev/ml-mentalhealth/mlops-repo/{E
 # Create the pipeline job
 
 job = aiplatform.PipelineJob(
-    enable_caching=False,
+    enable_caching=True,
     failure_policy='fast',
     display_name='mental-health-pipeline',
     template_path='pipeline.json',

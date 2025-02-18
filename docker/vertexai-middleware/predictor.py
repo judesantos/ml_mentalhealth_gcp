@@ -1,7 +1,7 @@
 """
-This module defines the custom container API endpoint for the Vertex AI model
+This module defines the custom container API endpoint for the Vertex AI model.
 
-The container implements the model inference endpoint. It is a Flask app with
+The container implements the model inference endpoint. It is a FastAPI app with
 a single POST endpoint /predict that accepts JSON data and returns the model
 prediction. Incoming prediction requests are prepared, processed, transformed,
 before being submitted to the model for prediction.
@@ -20,27 +20,26 @@ before being submitted to the model for prediction.
     - AIP_HEALTH_ROUTE: The health check endpoint
     - AIP_PREDICT_ROUTE: The prediction endpoint
 
-Runs on Gunicorn to manage concurrent requests
+Runs on Uvicorn to manage concurrent requests.
 """
 
 import os
+import time
 import joblib
 import logging
-from typing import List, Dict
-from threading import Lock
+import uvicorn
+from typing import List
 
 import pandas as pd
 import xgboost as xgb
-
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request, HTTPException, status
+from fastapi.responses import JSONResponse
 from google.cloud import storage
 
 from ml_inference_data import MentalHealthData
 
-
-# Create a Flask app
-app = Flask(__name__)
-model_lock = Lock()
+# Create a FastAPI app
+app = FastAPI()
 
 # The trained model object - initialized to None
 # Load on first request
@@ -49,6 +48,8 @@ xgb_model = None
 # Enable logging
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
+
+app.logger = logger
 
 # ---------------------------------------------------
 # Define feature names and expected order of features
@@ -71,7 +72,7 @@ EXPECTED_FEATURE_ORDER = [
 # Define preprocessing function
 # -----------------------------
 
-# Fallback model uri, AIP_STORAGE_URI is not set (Why - ask Google)
+# Fallback model URI, AIP_STORAGE_URI is not set (Why - ask Google)
 GCS_MODEL_PATH = os.getenv('AIP_STORAGE_URI')
 
 
@@ -86,35 +87,30 @@ def _load_model():
 
     MODEL_URI = 'gs://mlops-gcs-bucket/models/xgb-model/'
 
-    # MODEL_PATH = '/tmp/model.joblib'
     if xgb_model is None:
         if not GCS_MODEL_PATH:
-            print('AIP_STORAGE_URI environment variable not set.')
-            print(f'Loading model from {MODEL_URI}...')
+            logger.info('AIP_STORAGE_URI environment variable not set.')
+            logger.info(f'Loading model from {MODEL_URI}...')
             GCS_MODEL_PATH = MODEL_URI
 
         # Extract bucket name and prefix from GCS path
-
         parts = GCS_MODEL_PATH[5:].split("/", 1)
         bucket_name = parts[0]
         prefix = parts[1] if len(parts) > 1 else ""
 
-        print(f'Setting bucket name: {bucket_name}...')
+        logger.info(f'Setting bucket name: {bucket_name}...')
 
         # Initialize GCS client
-
         client = storage.Client()
         bucket = client.bucket(bucket_name)
 
         # List all blobs in the bucket
-
         blobs = list(bucket.list_blobs(prefix=prefix))
 
         if not blobs:
             raise ValueError('No files found in the bucket.')
 
         # Find the model file with the correct extension
-
         exts = ['.joblib']  # joblib is our model file extension
         model_blob = next(
             (b for b in blobs if b.name.endswith(tuple(exts))), None)
@@ -175,21 +171,23 @@ def _preprocess_input(data: List):
 # ----------------------------------------------------------------
 
 
-@app.route('/health', methods=['GET'])
-def health_check():
+@app.get('/')
+@app.get('/healthz')
+@app.get('/health')
+async def health_check():
     """
     Define a health check endpoint for the container.
     This is a required endpoint for Vertex AI custom containers.
     """
-    print('Health check endpoint called. Returning 200 OK.')
-    return jsonify({"status": "healthy"}), 200
+    logger.info('Health check endpoint called. Returning 200 OK.')
+    return JSONResponse(content={"status": "healthy"}, status_code=status.HTTP_200_OK)
 
 
-@app.route('/predict', methods=['POST'])
-def predict():
+@app.post('/predict')
+async def predict(request: Request):
     """
     Define the prediction endpoint for the container.
-    This is the required endpoint spefication for Vertex AI custom containers.
+    This is the required endpoint specification for Vertex AI custom containers.
     Handles incoming prediction requests and returns model inference results.
     Args:
         request: The incoming request object.
@@ -203,21 +201,16 @@ def predict():
     """
     try:
         logger.info('Predict endpoint called.')
-        # Print raw request headers and body
-        logger.debug(f'Request Headers: {request.headers}')
-        logger.debug(f'Request JSON: {request.get_json(
-            silent=True)}')  # Parsed JSON
+        # Parse JSON body
+        input_data = await request.json()
 
         # Validate input
-
-        if request.content_type != "application/json":
-            logger.error('Invalid content type. Expected application/json.')
-            return jsonify({"error": "Unsupported Media Type. Please use 'application/json'"}), 415
-
-        input_data = request.get_json(silent=True)
         if not input_data:
             logger.error('No input data provided.')
-            return jsonify({'error': 'No input data provided.'}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No input data provided."
+            )
 
         # Single instance prediction
         if "features" in input_data:
@@ -227,49 +220,51 @@ def predict():
             input_data = input_data["instances"]
         else:
             logger.error('Invalid input data format.')
-            return jsonify({'error': 'Invalid input data format.'}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid input data format."
+            )
 
         if len(input_data[0]) != 55:
             logger.error('Invalid number of parameters.')
-            return jsonify({'error': 'Invalid number of parameters.'}), 400
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid number of parameters."
+            )
 
         # Preprocess input
         processed_data = _preprocess_input(input_data)
 
         # Make prediction
-        with model_lock:
-            # Load the model
-            model = _load_model()
-            # Predict!
-            logger.info('Making prediction...')
-            predictions = _predict(processed_data, model)
+
+        # Load the model
+        model = _load_model()
+        # Predict!
+        logger.info('Making prediction...')
+        predictions = _predict(processed_data, model)
 
         logger.debug(f'Predictions: {predictions}')
 
         # Return response
-        return jsonify({
-            'success': 'true',
+        return JSONResponse(content={
+            'success': True,
             'prediction': predictions.tolist()
         })
 
     except Exception as e:
-        logger.exception(f'An error occurred:')
-        return jsonify({
-            'success': 'false',
-            'error': 'Server error occurred'
-        }), 500
+        logger.exception(f'An error occurred: {e}')
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server error occurred."
+        )
+
 
 # -------------------
-# Run the Flask app
+# Run the FastAPI app
 # -------------------
-
 
 if __name__ == '__main__':
     # Load the model singleton
     _load_model()
-    # Vertext AI custom containers require the app to listen on port 8080
-    app.run(
-        debug=True,
-        host='0.0.0.0',
-        port=8080
-    )
+    # Vertex AI custom containers require the app to listen on port 8080
+    uvicorn.run("predictor:app", host='0.0.0.0', port=8080, log_level='debug')

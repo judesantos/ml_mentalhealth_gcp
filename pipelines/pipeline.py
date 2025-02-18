@@ -47,7 +47,7 @@ from components.preprocess import preprocess_data
 from components.train import train_model
 from components.evaluate import evaluate_model
 from components.register import register_model
-from components.deploy import deploy_model
+from components.deploy_cloudrun import deploy_model
 
 
 def run_mental_health_pipeline(
@@ -149,7 +149,7 @@ def run_mental_health_pipeline(
         register_task = register_model(
             project_id=project_id,
             region=region,
-            display_name=f'{endpoint_name}-model',
+            display_name='xgb-model',
             model_artifact=model_artifact,
             container_image_uri=container_image_uri,
         ).after(evaluate_task)
@@ -168,7 +168,8 @@ def run_mental_health_pipeline(
             project_id=project_id,
             region=region,
             endpoint_name=endpoint_name,
-            model_resource=model_resource
+            container_image_uri=container_image_uri,
+            model_resource=model_resource,
         ).after(register_task)
 
     run_success = deploy_task.output
