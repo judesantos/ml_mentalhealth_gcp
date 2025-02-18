@@ -129,6 +129,7 @@ resource "google_project_service" "enabled_services" {
     "artifactregistry.googleapis.com",
     "aiplatform.googleapis.com",
     "file.googleapis.com",
+    "vpcaccess.googleapis.com"
   ])
   service = each.key
 

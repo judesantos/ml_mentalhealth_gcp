@@ -45,25 +45,37 @@ def deploy_model(
     client = run_v2.ServicesClient()
 
     # Define the service path
-    parent_path = f"projects/{project_id}/locations/{region}"
-    service_path = f"{parent_path}/services/{endpoint_name}"
+    parent_path = f'projects/{project_id}/locations/{region}'
+    service_path = f'{parent_path}/services/{endpoint_name}'
+
+    # vpc_connector_name: This is the name of the VPC connector setup in the GKE cluster
+    # See Terraform: google_vpc_access_connector.gke_serverless_connector
+    vpc_connector_name = 'gke-cloudrun-connector'
+    vpc_connector = f'projects/{project_id}/locations/{region}/connectors/{vpc_connector_name}'
 
     logger.info(f'Creating service: {service_path}')
 
     try:
         # Check if service already exists
-
         service = client.get_service(name=service_path)
+
         logger.info(
-            f"Cloud Run service '{endpoint_name}' exists. Updating...")
+            f'Cloud Run service "{endpoint_name}" exists. Updating...')
 
         # Update the existing service
-
         service.template.containers[0].image = container_image_uri
+
+        # Add VPC connector
+        service.template.vpc_access = run_v2.VpcAccess(
+            connector=vpc_connector,
+            egress=run_v2.VpcAccess.VpcEgress.ALL_TRAFFIC
+        )
+
+        # Update the service
         operation = client.update_service(
             service=service,
             update_mask={
-                "paths": ["template"]
+                'paths': ['template']
             }
         )
 
@@ -72,16 +84,19 @@ def deploy_model(
 
         # Define the Cloud Run Service configuration
         service = run_v2.Service(
-            ingress=run_v2.IngressTraffic.INGRESS_TRAFFIC_ALL,  # Allow all traffic
             template=run_v2.RevisionTemplate(
                 containers=[
                     run_v2.Container(
                         image=container_image_uri,  # Model container
                         resources=run_v2.ResourceRequirements(
-                            limits={"memory": "2Gi", "cpu": "4"}
+                            limits={'memory': '2Gi', 'cpu': '4'}
                         )
                     )
-                ]
+                ],
+                vpc_access=run_v2.VpcAccess(  # Attach VPC connector
+                    connector=vpc_connector,
+                    egress=run_v2.VpcAccess.VpcEgress.ALL_TRAFFIC
+                )
             ),
         )
         # Create new service
