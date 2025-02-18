@@ -39,11 +39,18 @@ def deploy_model(
 
     logger.info(f'Getting the Endpoint object from {endpoint_name}')
 
-    endpoint = aiplatform.Endpoint(
-        endpoint_name=f'projects/{project_id}/locations/{region}/endpoints/{endpoint_name}'
-    )
+    # List existing endpoints
+    endpoints = aiplatform.Endpoint.list(
+        filter=f'display_name="{endpoint_name}"')
 
-    logger.info(f'Endpoint object found {endpoint}')
+    if endpoints:
+        endpoint = endpoints[0]  # Use the first matching endpoint
+        logger.info(f'Found existing endpoint: {endpoint.resource_name}')
+    else:
+        # If endpoint does not exist, create a new one
+        logger.info('No existing endpoint found. Creating a new one...')
+        endpoint = aiplatform.Endpoint.create(display_name=endpoint_name)
+        logger.info(f'Created new endpoint: {endpoint.resource_name}')
 
     # Load the model
 
@@ -51,20 +58,22 @@ def deploy_model(
 
     model = aiplatform.Model(model_resource.uri)
 
-    logger.info(f'Deploying model to Vertex AI endpoint: {endpoint}.')
+    logger.info(
+        f'Deploying model to Vertex AI endpoint: {endpoint.resource_name}.')
 
     # Deploy the model
     model.deploy(
-        region=region,
         endpoint=endpoint,
         machine_type='n1-standard-4',
         min_replica_count=1,
         max_replica_count=2,
         enable_access_logging=True,
         disable_container_logging=False,
-        deploy_request_timeout=60,
+        deploy_request_timeout=600,
+        traffic_split={'0': 100},
     )
 
-    logger.info(f'Model deployed to Vertex AI endpoint: {endpoint}.')
+    logger.info(
+        f'Model deployed to Vertex AI endpoint: {endpoint.resource_name}.')
 
     return True
