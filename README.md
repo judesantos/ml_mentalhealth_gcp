@@ -42,6 +42,12 @@ Architecure:
   <img src="images/architecture.png" width=600 "/>
 </p>
 
+Vertex AI Model Training and Deployment Pipeline:
+
+<p align="center">
+  <img src="images/vertexai-success.png" width=300 "/>
+</p>
+
 ### Key Features:
 - **Automated Infrastructure**: Terraform manages cloud resources dynamically.
 - **Scalable ML Pipeline**: Vertex AI handles model training, evaluation, and deployment.
