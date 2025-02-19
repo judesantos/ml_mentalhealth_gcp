@@ -33,7 +33,7 @@ Below is an overview of the infrastructure and model training pipeline.
 Application:
 
 <p align="center">
-  <img src="images/app.png" width=600 />
+  <img src="images/ml-mentalhealth-app.gif" width=600 />
 </p>
 
 Architecure:
