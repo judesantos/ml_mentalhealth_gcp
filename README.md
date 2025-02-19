@@ -137,29 +137,22 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
     - Optimized Hyperparameters: Bayesian Optimization is used to fine-tune the model.
 
   - **Model Training Pipeline**
-
     The XGBoost model training process is fully automated in Vertex AI Pipelines and consists of the following key stages:
-
     - Preprocessing:
       - Converts categorical features into numerical representations.
       - Handles missing values using imputation techniques.
       - Scales numerical values for consistency.
-    
     - Feature Selection:
       - Uses LASSO Regression to identify the most predictive features.
       - Removes low-importance features based on feature importance scores from XGBoost.
-  
     - Model Training:
       - Trains an XGBoost Classifier with optimized hyperparameters.
       - Uses Bayesian Optimization to fine-tune max_depth, learning_rate, n_estimators, and min_child_weight.
-    
     - Model Evaluation:
       - Calculates key metrics: Accuracy, Precision, Recall, F1-score, AUC-ROC.
       - Generates confusion matrices for better interpretability.
-    
     - Model Registration:
       - Saves the trained XGBoost model into Vertex AI Model Registry for version control.
-    
     - Model Deployment:
       - Deploys the best-performing model to Vertex AI Endpoints for real-time inference.
 
