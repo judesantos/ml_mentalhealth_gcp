@@ -13,7 +13,7 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
 - [MLOps-&-Deployment](#MLops-&-Deployment)
-- [Developer Prerequisites](#Prerequisites)
+- [Developer Prerequisites](#Developer-Prerequisites)
 - [Project Structure](#Project-Structure)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
