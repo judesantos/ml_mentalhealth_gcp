@@ -12,7 +12,7 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 - [Project Overview](#Overview)
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
-- [MLOps-&-Deployment](#MLops-&-Deployment)
+- [MLOps Deployment](#MLops-Deployment)
 - [Developer Prerequisites](#Developer-Prerequisites)
 - [Project Structure](#Project-Structure)
 - [Getting Started](#getting-started)
@@ -158,7 +158,7 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
 
 ---
 
-## MLOps & Deployment
+## MLOps Deployment
 
 **Vertex AI Training Pipeline (XGBoost Integration)**
 
