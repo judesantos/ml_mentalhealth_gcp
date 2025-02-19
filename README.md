@@ -13,7 +13,7 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
 - [MLOps-&-Deployment](#MLops-&-Deployment)
-- [Prerequisites](#Prerequisites)
+- [Developer Prerequisites](#Prerequisites)
 - [Project Structure](#Project-Structure)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
@@ -119,7 +119,7 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
 ### Application Development
 - A **web-based application** enables users to input predefined survey responses based on the model's most predictive features.
 - The application provides **personalized insights** and **mental health recommendations**, ensuring accessibility on both desktop and mobile platforms.
-- The application is maintained in a separate GitHub repository [ml_mentalhealth_app](git@github.com:judesantos/ml_mentalhealth_app.git) and is automatically deployed through a Terraform-based CI/CD pipeline whenever a new version is pushed to the repository. The application can also be redeployed as needed during the model deployment process to ensure alignment with the latest model updates.
+- The application is maintained in a separate GitHub repository [ml_mentalhealth_app](https://github.com/judesantos/ml_mentalhealth_app.git) and is automatically deployed through a Terraform-based CI/CD pipeline whenever a new version is pushed to the repository. The application can also be redeployed as needed during the model deployment process to ensure alignment with the latest model updates.
 
 ---
 
@@ -188,9 +188,10 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 
 ---
 
-## Prerequisites
+## Developer Prerequisites
 
 ### Developer Requirements
+
 - **Basic understanding of computer networks**:
   - Network security (Firewalls, common vulnerabilities, and mitigation).
   - Network infrastructures (Load balancers, VPNs, subnetworks, IP blocks, IAM, etc.).
@@ -201,9 +202,10 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 - **Terraform basics**: [Learn Terraform with HashiCorp](https://developer.hashicorp.com/terraform/tutorials)
 
 ### Developer Environment
+
 **Note**: This project was developed on a **MacBook Pro M2** running macOS.
 
-Before deploying, ensure the following:
+Before deploying to a test environment, ensure the following:
 
 1. **Google Cloud Platform**:
    - A GCP account with billing enabled.
