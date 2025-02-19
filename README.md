@@ -189,6 +189,7 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 ---
 
 ## Developer Prerequisites
+*This project was developed on a **MacBook Pro M2** running macOS.*
 
 ### Developer Requirements
 
@@ -202,8 +203,6 @@ The deployment pipeline follows **MLOps best practices** to ensure:
 - **Terraform basics**: [Learn Terraform with HashiCorp](https://developer.hashicorp.com/terraform/tutorials)
 
 ### Developer Environment
-
-**Note**: This project was developed on a **MacBook Pro M2** running macOS.
 
 Before deploying to a test environment, ensure the following:
 
@@ -318,6 +317,7 @@ conda activate ml_gcp
 
 ### 2. Set Up Terraform Variables
 Create a `terraform.tfvars` file to specify your variables (replace placeholders with actual values):
+* See [terraform.tfvars.development](./terraform/terraform.tfvars.development)
 ```bash
 project_id = "gcp-project-id"
 region     = "region"
