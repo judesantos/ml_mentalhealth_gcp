@@ -121,6 +121,8 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
 - The application provides **personalized insights** and **mental health recommendations**, ensuring accessibility on both desktop and mobile platforms.
 - The application is maintained in a separate GitHub repository [ml_mentalhealth_app](git@github.com:judesantos/ml_mentalhealth_app.git) and is automatically deployed through a Terraform-based CI/CD pipeline whenever a new version is pushed to the repository. The application can also be redeployed as needed during the model deployment process to ensure alignment with the latest model updates.
 
+---
+
 ## Model Development
 
   - The core machine learning algorithm used in this project is XGBoost (Extreme Gradient Boosting), a powerful and scalable implementation of gradient boosting designed for high performance.
@@ -368,8 +370,6 @@ Go to cloud console and delete/disable resources and services if not so:
 
 ---
 
-
-
 ## Notes
 
 ### Troubleshooting
@@ -403,6 +403,8 @@ Create a new branch (feature/your-feature).
 Commit your changes.
 Push to the branch.
 Open a Pull Request.
+
+---
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
