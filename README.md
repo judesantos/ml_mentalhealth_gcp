@@ -1,7 +1,9 @@
 
-# ML Mental Health Modeling Pipeline on GCP Vertex AI, Orchestrated with Terraform
+# ML Mental Health Modeling Pipeline on GCP Vertex AI (MLOps), Orchestrated with Terraform (IaC)
 
-This project implements a **Machine Learning (ML) Mental Health Modeling Pipeline** on **Google Cloud Platform (GCP)**, leveraging **Vertex AI** for model development and deployment, and **Terraform** for infrastructure provisioning and management. The pipeline is fully automated, enabling infrastructure-as-code (IaC) practices for scalability and reproducibility.
+This project implements a **Machine Learning (ML) Mental Health Modeling Pipeline** on **Google Cloud Platform (GCP)** with **Vertex AI** for model development and deployment **(MLOps)**, and **Terraform** for infrastructure provisioning and management. 
+
+The pipeline is fully automated - from setup to deployment, and operation - enabling **infrastructure-as-code (IaC)** practices for scalability and reproducibility.
 
 ---
 
@@ -11,50 +13,79 @@ This project implements a **Machine Learning (ML) Mental Health Modeling Pipelin
 - [Datascience Approach](#Datascience-Approach)
 - [Model Development](#model-development)
 - [MLOps-&-Deployment](#MLops-&-Deployment)
-- [CI/CD Pipeline](#cicd-pipeline)
 - [Prerequisites](#Prerequisites)
 - [Project Structure](#Project-Structure)
 - [Getting Started](#getting-started)
 - [Contributing](#contributing)
 - [License](#license)
 
-
 ---
-
 
 ## Overview
 
 This project automates end-to-end machine learning workflows using GCP, Vertex AI, and Terraform.
+The project is designed to predict mental health conditions and can be repurposed for other domains like finance and customer analytics.
 
-The project is designed to predict mental health conditions and can be repurosed for other domains like finance and customer analytics.
-
-Below is an overview of the infrastructure and model training pipeline.
-
-Application:
-
-<p align="center">
-  <img src="images/ml-mentalhealth-app.gif" width=600 />
-</p>
-
-Architecure:
-
-<p align="center">
-  <img src="images/architecture.png" width=600 "/>
-</p>
-
-Vertex AI Model Training and Deployment Pipeline:
-
-<p align="center">
-  <img src="images/vertexai-success.png" width=300 "/>
-</p>
-
-### Key Features:
+Key Features:
 - **Automated Infrastructure**: Terraform manages cloud resources dynamically.
 - **Scalable ML Pipeline**: Vertex AI handles model training, evaluation, and deployment.
 - **Continuous Learning**: Models are retrained automatically as new data becomes available.
 - **Web Application**: A user-friendly interface for mental health predictions and insights.
 
----
+The following is an overview of the infrastructure and model training pipeline.
+
+
+### Application:
+
+<p align="center">
+  <img src="images/ml-mentalhealth-app.gif" width=600 />
+</p>
+
+  The Mental Health Support Application provides users with an interactive platform to assess, monitor, and receive guidance on mental well-being. The user interface is designed with simplicity   and accessibility in mind, ensuring a smooth experience for individuals seeking support.
+  
+  - User Authentication: Secure login and registration options.
+  - Personalized Experience: Users can engage with resources tailored to their mental health needs.
+  - Cloud-based Deployment: Hosted on a scalable cloud infrastructure for reliability and performance.
+  - Interactive UI: Designed for ease of navigation and engagement.
+  - Integration with AI Models: The Application in this setup - mental health application, uses XGBoost model.
+
+ 
+### Architecure:
+
+<p align="center">
+  <img src="images/architecture.png" width=600 "/>
+</p>
+
+  The cloud infrastructure is built on Google Cloud Platform (GCP), ensuring security, scalability, and maintainability. 
+  The architecture is structured as follows:
+
+  - Virtual Private Cloud (VPC): Segregates public and private resources for enhanced security.
+  - Cloud Load Balancer & Cloud Armor: Ensures high availability and protects against threats.
+  - BigQuery & Cloud Storage: Manages large-scale data ingestion and storage.
+  - Kubernetes Cluster (GKE): Orchestrates containerized services efficiently.
+  - Vertex AI Integration: Enables ML model training, monitoring, and deployment.
+  - Filestore & Monitoring: Supports persistent storage and real-time observability.
+
+  This setup enables seamless data flow from user interactions to model inference, ensuring a robust and scalable system.
+
+
+### Vertex AI Model Deployment:
+
+<p align="center">
+  <img src="images/vertexai-success.png" width=300 "/>
+</p>
+
+  The MLOps pipeline automates data processing, model training, evaluation, and deployment using Vertex AI Pipelines. 
+  The workflow consists of:
+  
+  - Preprocessing Data: Cleaning and transforming raw data into structured input for training.
+  - Model Training: Using machine learning algorithms with optimized hyperparameters.
+  - Model Evaluation: Assessing performance against validation datasets.
+  - Model Registration: Storing trained models in the registry for version control.
+  - Model Deployment: Deploying the best-performing model to a Vertex AI Endpoint for real-time predictions.
+  - Monitoring & Retraining: Using data drift detection mechanisms to trigger retraining when necessary.
+  
+  This streamlined MLOps framework ensures continuous model improvement and reliable predictions.
 
 ### Current Implementation: Mental Health Prediction
 
@@ -64,9 +95,7 @@ Mental health issues are widespread and complex, yet timely and personalized sup
 - **Healthcare Providers**: Prioritize care, optimize resources, and improve patient outcomes.
 - **Businesses & HR Teams**: Identify mental health risks among employees to enhance workplace well-being.
 - **Policy & Government Agencies**: Use aggregated insights for public health planning and resource allocation.
-- **Research & Academia**: Leverage the model framework for further analysis in mental health and beyond.
-
----
+- **Research & Academia**: Use the model framework for further analysis in mental health and beyond.
 
 ### Dataset & Data Pipeline
 
@@ -89,12 +118,67 @@ The ML pipeline is built on a continuously evolving dataset framework that integ
 
 ### Application Development
 - A **web-based application** enables users to input predefined survey responses based on the model's most predictive features.
-- The app provides **personalized insights** and **mental health recommendations**, ensuring accessibility on both desktop and mobile platforms.
+- The application provides **personalized insights** and **mental health recommendations**, ensuring accessibility on both desktop and mobile platforms.
+- The application is maintained in a separate GitHub repository [ml_mentalhealth_app](git@github.com:judesantos/ml_mentalhealth_app.git) and is automatically deployed through a Terraform-based CI/CD pipeline whenever a new version is pushed to the repository. The application can also be redeployed as needed during the model deployment process to ensure alignment with the latest model updates.
+
+## Model Development
+
+  - The core machine learning algorithm used in this project is XGBoost (Extreme Gradient Boosting), a powerful and scalable implementation of gradient boosting designed for high performance.
+
+  - **Why XGBoost?**
+    XGBoost was selected for the Mental Health Prediction Model due to:
+  
+    - Speed & Scalability: Efficient parallelization and handling of large datasets.
+    - Regularization: Built-in L1/L2 regularization prevents overfitting.
+    - Feature Importance: Provides interpretable feature importance scores.
+    - Handling Missing Data: Built-in support for sparse features.
+    - Optimized Hyperparameters: Bayesian Optimization is used to fine-tune the model.
+
+  - **Model Training Pipeline**
+
+    The XGBoost model training process is fully automated in Vertex AI Pipelines and consists of the following key stages:
+
+    - Preprocessing:
+      - Converts categorical features into numerical representations.
+      - Handles missing values using imputation techniques.
+      - Scales numerical values for consistency.
+    
+    - Feature Selection:
+      - Uses LASSO Regression to identify the most predictive features.
+      - Removes low-importance features based on feature importance scores from XGBoost.
+  
+    - Model Training:
+      - Trains an XGBoost Classifier with optimized hyperparameters.
+      - Uses Bayesian Optimization to fine-tune max_depth, learning_rate, n_estimators, and min_child_weight.
+    
+    - Model Evaluation:
+      - Calculates key metrics: Accuracy, Precision, Recall, F1-score, AUC-ROC.
+      - Generates confusion matrices for better interpretability.
+    
+    - Model Registration:
+      - Saves the trained XGBoost model into Vertex AI Model Registry for version control.
+    
+    - Model Deployment:
+      - Deploys the best-performing model to Vertex AI Endpoints for real-time inference.
 
 ---
 
 ## MLOps & Deployment
 
+**Vertex AI Training Pipeline (XGBoost Integration)**
+
+The XGBoost model is trained and deployed through Vertex AI Pipelines, structured as follows:
+
+- Data Ingestion: Loads CDC data from BigQuery and performs ETL operations.
+- Preprocessing & Feature Engineering: Uses Vertex AI Pipelines to clean and transform the dataset.
+- Model Training: XGBoost is trained using hyperparameter tuning.
+- Model Evaluation: The best model is selected based on validation metrics.
+- Model Registration: The model is stored in Vertex AI Model Registry.
+- Deployment: The model is deployed as an inference endpoint.
+- Monitoring & Retraining:
+  - Vertex AI monitors model performance in production.
+  - Automated retraining is triggered when data drift is detected.
+ 
 The deployment pipeline follows **MLOps best practices** to ensure:
 - **Scalability & Reliability**: Cloud-based deployment on **Google Cloud Platform (GCP)** using **Vertex AI**.
 - **Continuous Learning**: Automated monitoring, evaluation, and retraining of models to adapt to new data.
