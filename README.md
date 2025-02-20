@@ -23,7 +23,7 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 
 ## Overview
 
-The project is designed to predict mental health conditions, it can also be repurposed for other domains like finance and customer analytics.
+The project is designed to predict mental health conditions and can be repurposed for other domains like finance and customer analytics.
 
 **Project Implementation:** The original machine learning pipeline and model development were implemented in [SpringBoard-DSC_Capstone_Project_3](https://github.com/judesantos/Springboard_DS_ML/tree/main/SpringBoard-DSC_Capstone_Project_3).
   
