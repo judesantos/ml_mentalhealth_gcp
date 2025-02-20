@@ -25,9 +25,9 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 
 The project is designed to predict mental health conditions and can be repurposed for other domains like finance and customer analytics.
 
-**Project Implementation:** The original machine learning pipeline and model development were implemented in [SpringBoard-DSC_Capstone_Project_3](https://github.com/judesantos/Springboard_DS_ML/tree/main/SpringBoard-DSC_Capstone_Project_3).
+**Project Implementation:** The original machine learning pipeline and model development were implemented in [Data Science/ML Project](https://github.com/judesantos/Springboard_DS_ML/tree/main/SpringBoard-DSC_Capstone_Project_3).
   
-**Capstone Project Proposal:** Detailed project scope, objectives, and methodology are documented in the [Final Capstone Mental Health Prediction App Proposal](SpringBoard-DSC_Capstone_Project_3/Final_Capstone_Mental_Health_Prediction_App.pdf).
+**Capstone Project Proposal:** Detailed project scope, objectives, and methodology are documented in the [Mental Health Prediction Proposal](SpringBoard-DSC_Capstone_Project_3/Final_Capstone_Mental_Health_Prediction_App.pdf).
   
 This repository extends the work from the Capstone Project by deploying and automating the end-to-end machine learning workflow using GCP services with Vertex AI, GKE, and Terraform for infrastructure automation.
 
