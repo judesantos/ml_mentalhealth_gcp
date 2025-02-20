@@ -355,19 +355,11 @@ Retrieve the Terraform outputs to generate a report:
 terraform output -json > pipeline_report.json
 ```
 
-### 8. Clean Up (Optional)
+### 8. Destroy, Clean Up Resources and Services (Optional)
 To tear down the deployed infrastructure:
 ```bash
 terraform destroy
 ```
-Go to cloud console and delete/disable resources and services to make sure they are properly destroyed and removed from GCP:
-- Cloud SQL             # Application Authentication
-- BigQuery              # Vertex AI Feature Store
-- VPC Network           # VPC
-- Vertex AI             # Feature store, Model Registry, Pipelines
-- GCS                   # Cloud Buckets
-- GKE                   # Kubernetes Cluster
-- Artifacts Registry    # Atifact Registry (AKA: GCR)
 
 ---
 
