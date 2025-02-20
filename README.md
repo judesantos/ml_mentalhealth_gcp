@@ -360,7 +360,7 @@ To tear down the deployed infrastructure:
 ```bash
 terraform destroy
 ```
-Go to cloud console and delete/disable resources and services if not so:
+Go to cloud console and delete/disable resources and services to make sure they are properly destroyed and removed from GCP:
 - Cloud SQL             # Application Authentication
 - BigQuery              # Vertex AI Feature Store
 - VPC Network           # VPC
