@@ -28,6 +28,7 @@ The project is designed to predict mental health conditions and can be repurpose
 - **Project Implementation:** The core machine learning pipeline and model training are available in: [Data Science/ML Project](https://github.com/judesantos/Springboard_DS_ML/tree/main/SpringBoard-DSC_Capstone_Project_3).
 - **Project Proposal (UI Section):** The front-end design and functionality are outlined in: [Mental Health Prediction Proposal](SpringBoard-DSC_Capstone_Project_3/Final_Capstone_Mental_Health_Prediction_App.pdf).
 - **Capstone Project Final Report:** Detailed model development reports are documented in: [Mental Health Prediction Final Report](https://github.com/judesantos/Springboard_DS_ML/blob/main/SpringBoard-DSC_Capstone_Project_3/Final_Capstone_Mental_Health_Report.pdf)   
+
 This repository extends the work from the Capstone Project by deploying and automating the end-to-end machine learning workflow using GCP services with Vertex AI, GKE, and Terraform for infrastructure automation.
 
 
