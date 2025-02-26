@@ -213,7 +213,7 @@ Before deploying to a test environment, ensure the following:
      - `Storage Admin`, `Compute Admin`, `Vertex AI Admin` roles (depending on services used).
 
 2. **Local Environment**:
-   - Python => 3.12
+   - Python >= 3.12
    - Docker (Docker Desktop on MacOs)
    - Miniconda
    - Install [Terraform](https://www.terraform.io/downloads.html).
