@@ -2,7 +2,7 @@ from google.cloud import aiplatform
 
 def trigger_retraining(event, context):
     # Set your project and location
-    project = "your-project-id"
+    project = "ml_mentalhealth"
     location = "us-central1"
 
     # Initialize the Vertex AI client
@@ -11,9 +11,9 @@ def trigger_retraining(event, context):
     # Trigger a pipeline or custom training job
     pipeline = aiplatform.PipelineJob(
         display_name="retraining-pipeline",
-        template_path="gs://your-template-path",
+        template_path="gs://mlops-repo/templates",
         parameter_values={
-            "input_data": "gs://your-new-training-data-path",
+            "input_data": "gs://mlops-repo/input-data",
             # Add any additional parameters
         }
     )
