@@ -16,6 +16,7 @@ The pipeline is fully automated - from setup to deployment, and operation - enab
 - [Developer Prerequisites](#Developer-Prerequisites)
 - [Project Structure](#Project-Structure)
 - [Getting Started](#getting-started)
+- [Work in Progress](#Work-in-Progress)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -360,6 +361,27 @@ To tear down the deployed infrastructure:
 ```bash
 terraform destroy
 ```
+
+---
+
+## Work in Progress
+The following aspects of the project are currently under development and will be enhanced in future iterations:
+
+### Model Monitoring:
+  - Implementing advanced monitoring tools to track model performance, data drift, and prediction accuracy in real-time.
+  - Integrating alerts and dashboards for better observability.
+
+### Retraining Process:
+  - Enhancing the automated retraining pipeline to handle edge cases and ensure seamless integration with new data.
+  - Optimizing the retraining triggers based on data drift and model performance metrics.
+
+### Refactor Model Versioning:
+  - Improving the model versioning system to ensure better traceability and reproducibility of model iterations.
+  - Integrating version control best practices for model artifacts and metadata.
+
+### CI/CD Deployment:
+  - Expanding the test suite to cover more edge cases and ensure robustness in the CI/CD pipeline.
+  - Implementing automated end-to-end testing for both infrastructure and application deployments.
 
 ---
 
