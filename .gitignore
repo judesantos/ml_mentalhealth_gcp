@@ -57,3 +57,6 @@ terraform/pipeline.yaml
 terraform/post
 docker/mlops_app
 diagrams/
+
+# Coach memsearch
+.memsearch/
